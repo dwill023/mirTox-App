@@ -1,0 +1,110 @@
+---
+title: "Data Processing"
+author: "Author: Desiree Williams"
+date: "`r Sys.Date()`"
+output:
+  html_notebook:
+    theme: flatly
+    highlight: espresso
+    code_folding: hide
+---
+
+
+```{r message=FALSE, warning=FALSE}
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+
+})
+
+```
+
+
+This document outlines the processing of the data used in the app.
+
+# Normalized Count Data
+
+The Counts and differential expression were generated from the raw counts file (D:/zur_Nieden_Lab/MicroRNA/Counts/miRTox_counts.csv) using DESeq2 to generate the normalized counts and the differential expression.
+
+```{r}
+# saved normalized counts using below:
+# normalized_counts <- counts(dds2, normalized=TRUE)
+
+counts = as.data.frame(normalized_counts)
+counts = tibble::rownames_to_column(counts, "Geneid")
+
+counts_new = tidyr::pivot_longer(counts, cols = 2:31, names_to = "sample_rep", values_to = "norm_count")
+head(counts_new)
+```
+
+Add column showing sample_id, which is the sample name without the replicate number.
+
+```{r}
+sample_data = data.frame(sample_rep = unique(counts_new$sample_rep),
+                         sample_id = c(rep("Cyclopamine", 3), rep("Methoxyacetic acid", 3), rep("Ogremorphin", 3), rep("Triademenol", 3), rep("Cyclophosphamide", 3), rep("Methotrexate", 3), rep("Valproic acid", 3), rep("5-Flurouracil", 3), rep("Untreated", 3), rep("Hydrogen Peroxide", 3)))
+
+counts_new = left_join(counts_new, sample_data, by="sample_rep")
+head(counts_new)
+```
+
+```{r}
+saveRDS(counts_new, "C:/Users/willd/OneDrive/Desktop/microRNAs/mirTox-App/mirTox/data/counts_new.rds")
+```
+
+# Differentially expressed microRNAs
+Starting with the results from the microRNA_tox_analysis.Rmd pipeline. Take each res and put into a list of dataframes.
+
+```{r}
+DEG_list = list(
+  "Cyclopamine"  = res.1 %>% as.data.frame() %>% dplyr::select(log2FoldChange, padj) %>% tibble::rownames_to_column(var = "microRNA"),
+  "Methoxyacetic acid" = res.2 %>% as.data.frame() %>% dplyr::select(log2FoldChange, padj) %>% tibble::rownames_to_column(var = "microRNA"),
+  "Ogremorphin" = res.3 %>% as.data.frame() %>% dplyr::select(log2FoldChange, padj) %>% tibble::rownames_to_column(var = "microRNA"),
+  "Triademenol" = res.4 %>% as.data.frame() %>% dplyr::select(log2FoldChange, padj) %>% tibble::rownames_to_column(var = "microRNA"),
+  "Cyclophosphamide" = res.5 %>% as.data.frame() %>% dplyr::select(log2FoldChange, padj) %>% tibble::rownames_to_column(var = "microRNA"),
+  "Methotrexate" = res.6 %>% as.data.frame() %>% dplyr::select(log2FoldChange, padj) %>% tibble::rownames_to_column(var = "microRNA"),
+  "Valproic acid" = res.7 %>% as.data.frame() %>% dplyr::select(log2FoldChange, padj) %>% tibble::rownames_to_column(var = "microRNA"),
+  "5-Flurouracil" = res.8 %>% as.data.frame() %>% dplyr::select(log2FoldChange, padj) %>% tibble::rownames_to_column(var = "microRNA"),
+  "Hydrogen Peroxide" = res.9 %>% as.data.frame() %>% dplyr::select(log2FoldChange, padj) %>% tibble::rownames_to_column(var = "microRNA")
+)
+
+
+DEG_list
+```
+
+
+```{r}
+sig_list = lapply(DEG_list, filter, padj < 0.05)
+sig_list_up = lapply(sig_list, filter, log2FoldChange > 1)
+
+list_f = list("Cyclopamine" = c(sig_list_up$Cyclopamine$microRNA),
+                  "Methoxyacetic acid" = c(sig_list_up$`Methoxyacetic acid`$microRNA),
+                  "Ogremorphin" = c(sig_list_up$Ogremorphin$microRNA),
+                  "Triademenol" = c(sig_list_up$Triademenol$microRNA),
+                  "Cyclophosphamide" = c(sig_list_up$Cyclophosphamide$microRNA),
+                  "Methotrexate" = c(sig_list_up$Methotrexate$microRNA),
+                  "Valproic acid" = c(sig_list_up$`Valproic acid`$microRNA),
+                  "5-Flurouracil" = c(sig_list_up$`5-Flurouracil`$microRNA))
+```
+
+
+```{r}
+saveRDS(DEG_list, "C:/Users/willd/OneDrive/Desktop/microRNAs/mirTox-App/mirTox/data/DEG_list.rds")
+```
+
+# Match counts data to DEG data
+
+Remove all miRNAs not within the DEG data. Some miRNAs in the DEG data were removed if they had no counts or only a single count across all samples.
+
+```{r}
+dim(counts_new)
+# [1] 79560     4
+counts_new = counts_new %>% filter(Geneid %in% DEG_list$Cyclopamine$microRNA)
+dim(counts_new)
+# [1] 59490     4
+```
+
+```{r}
+saveRDS(counts_new, "C:/Users/willd/OneDrive/Desktop/microRNAs/mirTox-App/mirTox/data/counts_new.rds")
+```
+
+
