@@ -5,9 +5,9 @@ account: willdesi
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 6844791
-bundleId: 6239040
+bundleId: 6263894
 url: https://willdesi.shinyapps.io/mirTox-App/
-when: 1661478262.01012
-lastSyncTime: 1661478262.01013
+when: 1662146476.22139
+lastSyncTime: 1662146476.2214
 asMultiple: FALSE
 asStatic: FALSE
