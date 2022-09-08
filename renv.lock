@@ -3,12 +3,28 @@
     "Version": "4.2.1",
     "Repositories": [
       {
-        "Name": "CRAN",
-        "URL": "https://cran.rstudio.com"
-      },
-      {
         "Name": "BioCsoft",
         "URL": "https://bioconductor.org/packages/3.15/bioc"
+      },
+      {
+        "Name": "BioCann",
+        "URL": "https://bioconductor.org/packages/3.15/data/annotation"
+      },
+      {
+        "Name": "BioCexp",
+        "URL": "https://bioconductor.org/packages/3.15/data/experiment"
+      },
+      {
+        "Name": "BioCworkflows",
+        "URL": "https://bioconductor.org/packages/3.15/workflows"
+      },
+      {
+        "Name": "BioCbooks",
+        "URL": "https://bioconductor.org/packages/3.15/books"
+      },
+      {
+        "Name": "CRAN",
+        "URL": "https://cran.rstudio.com"
       }
     ]
   },
@@ -526,10 +542,10 @@
     },
     "aplot": {
       "Package": "aplot",
-      "Version": "0.1.6",
+      "Version": "0.1.7",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "f33f09b723d25086d5373d996be34cc3",
+      "Hash": "c827e1724f09b5a8696972803adb1d26",
       "Requirements": [
         "ggfun",
         "ggplot2",
@@ -547,14 +563,6 @@
       "Requirements": [
         "sys"
       ]
-    },
-    "backports": {
-      "Package": "backports",
-      "Version": "1.4.1",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "c39fbec8a30d23e721980b8afb31984c",
-      "Requirements": []
     },
     "base64enc": {
       "Package": "base64enc",
@@ -654,16 +662,6 @@
       "Requirements": [
         "fastmap",
         "rlang"
-      ]
-    },
-    "checkmate": {
-      "Package": "checkmate",
-      "Version": "2.1.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "147e4db6909d8814bb30f671b49d7e06",
-      "Requirements": [
-        "backports"
       ]
     },
     "cli": {
@@ -809,10 +807,10 @@
     },
     "dplyr": {
       "Package": "dplyr",
-      "Version": "1.0.9",
+      "Version": "1.0.10",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "f0bda1627a7f5d3f9a0b5add931596ac",
+      "Hash": "539412282059f7f0c07295723d23f987",
       "Requirements": [
         "R6",
         "generics",
@@ -824,6 +822,17 @@
         "tibble",
         "tidyselect",
         "vctrs"
+      ]
+    },
+    "ds4psy": {
+      "Package": "ds4psy",
+      "Version": "0.8.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "b6abf5f27952ec5d8baff3010484dbe8",
+      "Requirements": [
+        "ggplot2",
+        "unikn"
       ]
     },
     "edgeR": {
@@ -1267,14 +1276,14 @@
     },
     "gt": {
       "Package": "gt",
-      "Version": "0.6.0",
+      "Version": "0.7.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "842059d3f71b14e812500b23eeea765e",
+      "Hash": "b6f71436ae6088b9a773a5253217ade1",
       "Requirements": [
         "base64enc",
         "bitops",
-        "checkmate",
+        "cli",
         "commonmark",
         "dplyr",
         "fs",
@@ -1292,10 +1301,10 @@
     },
     "gtable": {
       "Package": "gtable",
-      "Version": "0.3.0",
+      "Version": "0.3.1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "ac5c6baf7822ce8732b343f14c072c4d",
+      "Hash": "36b4265fb818f6a342bed217549cd896",
       "Requirements": []
     },
     "gtools": {
@@ -1940,10 +1949,10 @@
     },
     "scatterpie": {
       "Package": "scatterpie",
-      "Version": "0.1.7",
+      "Version": "0.1.8",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "f4d12f5fdf169e10739fe554e7705159",
+      "Hash": "49c8628a96243f66d30d58c898a2c6db",
       "Requirements": [
         "ggforce",
         "ggfun",
@@ -1994,10 +2003,10 @@
     },
     "shinyWidgets": {
       "Package": "shinyWidgets",
-      "Version": "0.7.2",
+      "Version": "0.7.3",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "889030b350a9c968bd9df9c6ff267576",
+      "Hash": "93797f9ae8185c55a2f775f331591a55",
       "Requirements": [
         "anytime",
         "bslib",
@@ -2081,10 +2090,10 @@
     },
     "survival": {
       "Package": "survival",
-      "Version": "3.3-1",
+      "Version": "3.4-0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "f6189c70451d3d68e0d571235576e833",
+      "Hash": "04411ae66ab4659230c067c32966fc20",
       "Requirements": [
         "Matrix"
       ]
@@ -2239,6 +2248,16 @@
         "magrittr",
         "rlang",
         "vctrs"
+      ]
+    },
+    "unikn": {
+      "Package": "unikn",
+      "Version": "0.5.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "28f480fe4662e9bbaada1cead3e901fc",
+      "Requirements": [
+        "ggplot2"
       ]
     },
     "upsetjs": {

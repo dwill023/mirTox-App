@@ -1,10 +1,13 @@
+library(BiocManager)
+options(repos = BiocManager::repositories())
 library(shiny)
 library(shinyjs)
-library(bs4Dash)
-library(fresh)
 library(shinyWidgets)
 library(shinycssloaders)
 library(shinycustomloader) 
+#library(shinyalert)
+library(bs4Dash)
+library(fresh)
 library(DT)
 library(dplyr)
 library(ggplot2)
@@ -28,6 +31,8 @@ library(org.Hs.eg.db)
 library(ReactomePA)
 library(DOSE)
 library(viridis)
+library(ds4psy)
+library(unikn)
 
 set.seed(99)
 
@@ -235,40 +240,57 @@ body <- bs4DashBody(
                                                                   actionBttn("go4", "Plot", style = "jelly", color="danger"))),
                                                   plotOutput("radar2", width = "100%", height = "800px") %>% withSpinner(type = 6),
                                                   downloadButton("downrad2", "Download Plot", icon=icon("download", lib = "font-awesome"))))))),
-              fluidRow(column(12,
-                              tabBox(id = "tabbox3",title = "Gene Target Ontology", side= "right", width = 12, height = "1000px", type = "tabs", status = "primary", solidHeader = T,  collapsible = T, maximizable = T, background = "gray",
-                                     tabPanel(HTML('<h6 style="color:black;">miR Targets</h6>'),
-                                              fluidRow(column(3,
-                                                              pickerInput("tox2", label = "Choice of toxicant", choices = names(DEG), multiple = F, options = list(style = "btn-light", `live-search` = TRUE))),
-                                                        column(3,
-                                                              radioGroupButtons("reg2", "Choose:", choices = c("Up-regulated", "Down-regulated"), individual = TRUE, checkIcon = list(
-                                                                yes = tags$i(class = "fa fa-circle", 
-                                                                             style = "color: teal"),
-                                                                no = tags$i(class = "fa fa-circle-o", 
-                                                                            style = "color: teal"))))),
-                                                  fluidRow(column(3,
-                                                                  sliderTextInput("FC_3", "Log2Fold-Change (absolute value)", choices = seq(from= 0, to= 4, by=0.5), grid = TRUE, selected = 1)),
-                                                           column(3,
-                                                                  pickerInput("FDR_3", "False Discovery Rate", choices = c(0.1, 0.05, 0.01), selected = 0.05)),
-                                                           column(3,
-                                                                  actionBttn("go5", "Get Table", style = "jelly", color="danger"))),
-                                                  br(),
-                                                  shinycustomloader::withLoader(DT::DTOutput("targetstable",  height = "500px"), type = 'image', loader = 'coffee_loading.gif')),
-                                     tabPanel(HTML('<h6 style="color:black;">Ontology</h6>'), value = "tab2",
-                                                   fluidRow(column(4,
-                                                                   radioGroupButtons("ont", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
-                                                                   column(3,
-                                                                          actionBttn("go6", "Get Table", style = "jelly", color="danger"))),
-                                              br(),
-                                              DT::DTOutput("GOtable", height = "500px") %>% withSpinner(type =6 , size=1)),
-                                     tabPanel(HTML('<h6 style="color:black;">Ontology Plot</h6>'), value = "tab3",
-                                              fluidRow(column(5,
-                                                              pickerInput("ont_pick", label = "Choose Ontology", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
-                                                        column(3,
-                                                               actionBttn("go7", "Plot", style = "jelly", color="danger"))),
-                                              plotlyOutput("ont_plot") %>% withSpinner(type =6 , size=1))
-                                         )
-                                  ))
+              fluidRow(column(12, div(id = "go_box",
+                                      tabBox(id = "tabbox3",title = "Gene Target Ontology", side= "right", width = 12, height = "1100px", type = "tabs", status = "primary", solidHeader = T,  collapsible = T, maximizable = T, background = "gray",
+                                             label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Choose a toxicant or enter your own list of microRNAs to get the predicted gene targets. <br>Subsequent tabs will appear and the predicted targets will be used in choice of ontology and can be plotted in the other tabs.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
+                                             tabPanel(HTML('<h6 style="color:black;">miR Targets</h6>'),
+                                                      fluidRow(column(3,
+                                                                      radioGroupButtons("go_choice", "Choice of input", choices = c("Toxicant", "Custom List"), status = "primary", individual = T, checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon"))))),
+                                                      shinyjs::hidden(div(id = "choice_a",
+                                                                          fluidRow(column(3,
+                                                                                          pickerInput("tox2", label = "Choice of toxicant", choices = names(DEG), multiple = F, options = list(style = "btn-light", `live-search` = TRUE))),
+                                                                                   column(4,
+                                                                                          radioGroupButtons("reg2", "Choose:", choices = c("Up-regulated", "Down-regulated"), individual = TRUE, checkIcon = list(
+                                                                                            yes = tags$i(class = "fa fa-circle", 
+                                                                                                         style = "color: teal"),
+                                                                                            no = tags$i(class = "fa fa-circle-o", 
+                                                                                                        style = "color: teal"))))),
+                                                                          fluidRow(column(3,
+                                                                                          sliderTextInput("FC_3", "Log2Fold-Change (absolute value)", choices = seq(from= 0, to= 4, by=0.5), grid = TRUE, selected = 1)),
+                                                                                   column(3,
+                                                                                          pickerInput("FDR_3", "False Discovery Rate", choices = c(0.1, 0.05, 0.01), selected = 0.05))))),
+                                                      shinyjs::hidden(div(id = "choice_b",
+                                                                          fluidRow(column(4,
+                                                                                          textAreaInput("mir_list", "Input custom microRNAs", placeholder = "hsa-miR-21-5p", cols=17, rows = 4, resize = "both"))))),
+                                                      fluidRow(column(3,
+                                                                      actionBttn("go5", "Get Table", style = "jelly", color="danger")),
+                                                               actionButton("resetAll", "Reset all")),
+                                                      br(),
+                                                      shinycustomloader::withLoader(DT::DTOutput("targetstable",  height = "500px"), type = 'image', loader = 'coffee_loading.gif')),
+                                             tabPanel(HTML('<h6 style="color:black;">Ontology</h6>'), value = "tab2",
+                                                      fluidRow(column(4,
+                                                                      radioGroupButtons("ont", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
+                                                               column(3,
+                                                                      actionBttn("go6", "Get Table", style = "jelly", color="danger"))),
+                                                      br(),
+                                                      shinycustomloader::withLoader(DT::DTOutput("GOtable", height = "500px"), type = 'image', loader = 'loading.gif')),
+                                             tabPanel(HTML('<h6 style="color:black;">Dot Plot</h6>'), value = "tab3",
+                                                      fluidRow(column(5,
+                                                                      pickerInput("ont_pick", label = "Choose Ontology", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
+                                                               column(3,
+                                                                      actionBttn("go7", "Plot", style = "jelly", color="danger"))),
+                                                      plotOutput("ont_plot", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
+                                                      downloadButton("downgo", "Download Plot", icon=icon("download", lib = "font-awesome"))),
+                                             tabPanel(HTML('<h6 style="color:black;">Bar Plot</h6>'), value = "tab4",
+                                                      fluidRow(column(5,
+                                                                      pickerInput("ont_pick2", label = "Choose Ontology", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
+                                                               column(3,
+                                                                      actionBttn("go8", "Plot", style = "jelly", color="danger"))),
+                                                      plotOutput("ont_barplot", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
+                                                      downloadButton("downgo2", "Download Plot", icon=icon("download", lib = "font-awesome")))
+                                      ))# div go_box
+
+                                  )) # GO 
               )
             ) # Tab2
     
@@ -645,11 +667,42 @@ server <- function(input, output, session) {
   
   # GO analysis
   
+  # hide the other two tabs that depend on values generated in the first tab
   observe({
     hide(selector = "#tabbox3 li a[data-value=tab2]")
     hide(selector = "#tabbox3 li a[data-value=tab3]")
+    hide(selector = "#tabbox3 li a[data-value=tab4]")
   })
   
+  observe({
+    toggle(id = "choice_a", condition = {input$go_choice %in% "Toxicant"})
+    toggle(id = "choice_b", condition = {input$go_choice %in% "Custom List"})
+  })
+  
+  observeEvent(input$resetAll, {
+    reset("go_box")
+    hide(selector = "#tabbox3 li a[data-value=tab2]")
+    hide(selector = "#tabbox3 li a[data-value=tab3]")
+    hide(selector = "#tabbox3 li a[data-value=tab4]")
+  })
+  
+  mirs_choice <- reactive({
+    if(input$go_choice %in% "Toxicant"){
+      df = DEG[[input$tox2]]
+      if (input$reg2 == "Up-regulated"){
+        filtered_list = df %>% dplyr::filter(padj < as.numeric(input$FDR_3) & (log2FoldChange > input$FC_3))
+      } else {
+        filtered_list = df %>% dplyr::filter(padj < as.numeric(input$FDR_3) & (log2FoldChange < input$FC_3))
+      }
+      mirs = tolower(filtered_list$microRNA)
+    } else {
+      mirs = scan(text = input$mir_list, what = "")
+      mirs = tolower(mirs)
+    }
+    mirs
+  })
+  
+
   # get the microRNA targets for a specific toxicant
   .on.public.web <- FALSE; # only TRUE when on mirnet web server
   # function to set up the type of mir targets needed. 
@@ -666,13 +719,7 @@ server <- function(input, output, session) {
   }
   
   mirnet_targets <- eventReactive(input$go5, {
-    df = DEG[[input$tox2]]
-    if (input$reg2 == "Up-regulated"){
-      filtered_list = df %>% dplyr::filter(padj < as.numeric(input$FDR_3) & (log2FoldChange > input$FC_3))
-    } else {
-      filtered_list = df %>% dplyr::filter(padj < as.numeric(input$FDR_3) & (log2FoldChange < input$FC_3))
-    }
-    mirs = tolower(filtered_list$microRNA)
+    mirs = mirs_choice()
     #### Step 1. Initiate the dataSet object
     Init.Data("mir", "mirlist")
     #### Step 2. Set up the user input data
@@ -691,9 +738,11 @@ server <- function(input, output, session) {
                                                        pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
   })
   
+  # once the get table button on the first tab is clicked, reveal the other three tabs.
   observeEvent(input$go5, {
     shinyjs::toggle(selector = "#tabbox3 li a[data-value=tab2]")
     shinyjs::toggle(selector = "#tabbox3 li a[data-value=tab3]")
+    shinyjs::toggle(selector = "#tabbox3 li a[data-value=tab4]")
   })
   
   
@@ -728,7 +777,7 @@ server <- function(input, output, session) {
     
   })
   
-  
+  # use the ontologies generated above as choices to plot
   observe({
     df = go_table()$Description
     updatePickerInput(session, "ont_pick", choices = unique(df))
@@ -736,20 +785,59 @@ server <- function(input, output, session) {
   
   go_plot <- eventReactive(input$go7, {
     path.table = go_table() %>% dplyr::filter(Description %in% input$ont_pick)
-    p <- ggplot(path.table, aes(GeneRatio, forcats::fct_reorder(Description, GeneRatio), text = paste0("Pathway: ", Description, "<br>Genes: ", geneID))) +
+    p <- ggplot(path.table, aes(GeneRatio, forcats::fct_reorder(Description, GeneRatio))) +
       geom_point(aes(color=p.adjust, size = Count), position = position_jitter(width = 0.01, height = 0.01)) + 
       scale_color_viridis() +
       scale_size(range = c(2,10)) +
       theme_bw() +
       xlab("GeneRatio") + ylab(NULL) +
-      ggtitle(paste0(input$reg2, " microRNA targets in ", input$ont, " ontologies"))
-    ggplotly(p, tooltip = "text")
+      ggtitle(paste0(ifelse(input$go_choice %in% "Toxicant", input$tox2, input$go_choice), " ", ifelse(input$go_choice %in% "Toxicant", input$reg2, "of"), " microRNAs in ", input$ont, " ontologies"))
+    p
   })
   
-  output$ont_plot <- renderPlotly({
+  output$ont_plot <- renderPlot({
     go_plot()
   })
   
+  #download handler to generate plotdownload
+  output$downgo <- downloadHandler(
+    filename = function(){ paste0("GO_dotplot", ".png")},
+    content = function(file) {
+    ggplot2::ggsave(file, plot = go_plot(), width = 8, height = 11, units = "in", device = "png")
+    }
+  )
+  
+  # use the ontologies generated as choices to plot
+  observe({
+    df = go_table()$Description
+    updatePickerInput(session, "ont_pick2", choices = unique(df))
+  })
+  
+  go_plotbar <- eventReactive(input$go8, {
+    path.table = go_table() %>% dplyr::filter(Description %in% input$ont_pick2) %>% dplyr::mutate(negative_log10_of_adjusted_p_value = -log10(p.adjust))
+    colors <- unikn::usecol(pal = pal_petrol, n=19)
+    p =  ggplot(path.table, aes(forcats::fct_reorder(Description, negative_log10_of_adjusted_p_value), negative_log10_of_adjusted_p_value)) +
+      geom_col(aes(fill=negative_log10_of_adjusted_p_value)) +
+      scale_fill_gradientn(colors = colors) +
+      coord_flip() +
+      labs(title = paste0(ifelse(input$go_choice %in% "Toxicant", input$tox2, input$go_choice), " ", ifelse(input$go_choice %in% "Toxicant", input$reg2, "of"), " microRNAs in ", input$ont, " ontologies"),
+           x= NULL, y = expression("-Log"[10]*"(adjusted p-value)"), fill = expression("-Log"[10]*"(p.adjust)")) +
+      ds4psy::theme_ds4psy(col_title = "#37474f" , col_brdrs = "#37474f")
+    p
+  })
+  
+  output$ont_barplot <- renderPlot({
+    go_plotbar()
+  })
+  
+  #download handler to generate plotdownload
+  output$downgo2 <- downloadHandler(
+    filename = function(){ paste0("GO_barplot", ".png")},
+    content = function(file) {
+      ggplot2::ggsave(file, plot = go_plotbar(), width = 14, height = 11, units = "in", device = "png", bg = "white")
+    }
+  )
+
 } #server
 
 
