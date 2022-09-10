@@ -206,16 +206,26 @@ body <- bs4DashBody(
                                   label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Maximize box to view plot. <br>DESeq2's normalized counts are used to plot the heatmaps.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                   tabBox(id = "tabbox", width = 12, type = "pills", status = "gray-dark", solidHeader = T,  collapsible = F, background = "gray-dark",
                                          tabPanel("All Counts",
+                                                  fluidRow(column(4,
+                                                                  pickerInput("tox_choice1", label = "Choice of Toxicants", choices = unique(counts$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
+                                                           column(3,
+                                                                  actionBttn("go_heat1", "Plot", style = "jelly", color="danger"))),
                                                   plotOutput("heatmap1", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1, color = "#343a40"),
                                                   downloadButton("downheat1", "Download Plot", icon=icon("download", lib = "font-awesome"))),
-                                         tabPanel("Averaged Counts",
+                                         tabPanel("Median Counts",
+                                                  fluidRow(column(4,
+                                                                  pickerInput("tox_choice2", label = "Choice of Toxicants", choices = unique(counts$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
+                                                           column(3,
+                                                                  actionBttn("go_heat2", "Plot", style = "jelly", color="danger"))),
                                                   plotOutput("heatmap2", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1, color = "#343a40"),
                                                   downloadButton("downheat2", "Download Plot", icon=icon("download", lib = "font-awesome"))),
                                          tabPanel("Selected miRNAs",
-                                                  fluidRow(column(6,
+                                                  fluidRow(column(4,
+                                                                  pickerInput("tox_choice3", label = "Choice of Toxicants", choices = unique(counts$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
+                                                           column(4,
                                                                   pickerInput("mirs_choice", label = "Choice of microRNA", choices = unique(counts$Geneid), multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
                                                            column(3,
-                                                                  actionBttn("go2", "Plot", style = "jelly", color="danger"))),
+                                                                  actionBttn("go_heat3", "Plot", style = "jelly", color="danger"))),
                                                   plotOutput("heatmap3", width = "100%", height = "700px") %>% withSpinner(type = 6, size=1, color = "#343a40"),
                                                   downloadButton("downheat3", "Download Plot", icon=icon("download", lib = "font-awesome"))))
                                   ))),
@@ -269,7 +279,7 @@ body <- bs4DashBody(
                                                       shinycustomloader::withLoader(DT::DTOutput("targetstable",  height = "500px"), type = 'image', loader = 'coffee_loading.gif')),
                                              tabPanel(HTML('<h6 style="color:black;">Ontology</h6>'), value = "tab2",
                                                       fluidRow(column(4,
-                                                                      radioGroupButtons("ont", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
+                                                                      radioGroupButtons("ont", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease", "GO:Biological Process"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
                                                                column(3,
                                                                       actionBttn("go6", "Get Table", style = "jelly", color="danger"))),
                                                       br(),
@@ -481,15 +491,21 @@ server <- function(input, output, session) {
   
   # heatmaps
   
-  mat_df <- reactive({
-    counts %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% tibble::column_to_rownames(var = "Geneid") %>% as.matrix()
-  })
-  
-  heat_df1 <- reactive({
-    heat = t(scale(t(mat_df()[,1:ncol(mat_df())]))) # calculates the z-score of samples starting in column 1  
-    anno = data.frame(Treatment = c(rep("Cyclopamine", 3), rep("Methoxyacetic acid", 3), rep("Ogremorphin", 3), rep("Triademenol", 3), rep("Cyclophosphamide", 3), rep("Methotrexate", 3), rep("Valproic acid", 3), rep("5-Flurouracil", 3), rep("Untreated", 3), rep("Hydrogen Peroxide", 3)), check.names = F)
+
+  heat_df1 <- eventReactive(input$go_heat1, {
+    choices = input$tox_choice1
+    filt_counts = counts %>% dplyr::filter(sample_id %in% input$tox_choice1)
+    mat = filt_counts %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% tibble::column_to_rownames(var = "Geneid") %>% as.matrix()
+    heat = t(scale(t(mat[,1:ncol(mat)]))) # calculates the z-score of samples starting in column 1  
+    heat = na.omit(heat)
+    treatments = c()
+    for(i in choices){
+      t = rep(i, 3)
+      treatments = c(treatments, t)
+    }
+    anno = data.frame(Treatment = treatments, check.names = F)
     row.names(anno) <- colnames(heat)
-    pheatmap(heat, annotation_col = anno, show_rownames = F, treeheight_row = 0, main = "Heatmap for all miRNAs")
+    pheatmap(heat, annotation_col = anno, show_rownames = F, treeheight_row = 0, main = "Normalized counts for all miRNAs")
   })
   
   output$heatmap1 <- renderPlot({
@@ -504,24 +520,18 @@ server <- function(input, output, session) {
     }
   )
   
-  heat_df2 <- reactive({
-    mat = mat_df()
-    df_ave = data.frame(CYCLO = rowMeans(mat[,1:3]),
-                        MAA =  rowMeans(mat[,4:6]),
-                        OGM =  rowMeans(mat[,7:9]),
-                        MENOL = rowMeans(mat[,10:12]),
-                        CPA = rowMeans(mat[,13:15]),
-                        MTX = rowMeans(mat[,16:18]),
-                        VPA = rowMeans(mat[,19:21]),
-                        `5FU` = rowMeans(mat[,22:24]),
-                        UNT = rowMeans(mat[,25:27]),
-                        H2O2 = rowMeans(mat[,28:30]),
-                        check.names = F)
-    mat2 = as.matrix(df_ave)
-    heat = t(scale(t(mat2[,1:ncol(mat2)]))) # calculates the z-score of samples starting in column 1  
-    anno = data.frame(Treatment = c("Cyclopamine","Methoxyacetic acid","Ogremorphin","Triademenol","Cyclophosphamide","Methotrexate", "Valproic acid", "5-Flurouracil","Untreated", "Hydrogen Peroxide"), check.names = F)
+  heat_df2 <- eventReactive(input$go_heat2, {
+    filt_counts = counts %>% dplyr::filter(sample_id %in% input$tox_choice2)
+    median_counts = filt_counts %>% dplyr::select(-sample_rep) %>% dplyr::group_by(Geneid, sample_id)  %>% dplyr::summarise(median = median(norm_count)) %>%
+      tidyr::pivot_wider(names_from = sample_id, values_from = median) %>% tibble::column_to_rownames(var = "Geneid") %>% as.matrix()
+    
+    heat = t(scale(t(median_counts[,1:ncol(median_counts )]))) # calculates the z-score of samples starting in column 1  
+    heat = na.omit(heat) # remove NaN values if any
+    
+    anno = data.frame(Treatment = colnames(heat), check.names = F)
     row.names(anno) <- colnames(heat)
-    pheatmap(heat, annotation_col = anno, show_rownames = F, treeheight_row = 0, main = "Heatmap for all miRNAs")
+    
+    pheatmap(heat, annotation_col = anno, show_rownames = F, treeheight_row = 0, main = "Median normalized counts for all miRNAs")
   })
   
   output$heatmap2 <- renderPlot({
@@ -536,25 +546,15 @@ server <- function(input, output, session) {
     }
   )
   
-  heat_df3 <- eventReactive(input$go2, {
-    mat = mat_df()
-    df_ave = data.frame(CYCLO = rowMeans(mat[,1:3]),
-                        MAA =  rowMeans(mat[,4:6]),
-                        OGM =  rowMeans(mat[,7:9]),
-                        MENOL = rowMeans(mat[,10:12]),
-                        CPA = rowMeans(mat[,13:15]),
-                        MTX = rowMeans(mat[,16:18]),
-                        VPA = rowMeans(mat[,19:21]),
-                        `5FU` = rowMeans(mat[,22:24]),
-                        UNT = rowMeans(mat[,25:27]),
-                        H2O2 = rowMeans(mat[,28:30]),
-                        check.names = F)
-    df_ave = df_ave %>% tibble::rownames_to_column(var = "gene") %>% dplyr::filter(gene %in% input$mirs_choice) %>% tibble::column_to_rownames(var = "gene")
-    mat2 = as.matrix(df_ave)
-    heat = t(scale(t(mat2[,1:ncol(mat2)]))) # calculates the z-score of samples starting in column 1  
-    anno = data.frame(Treatment = c("Cyclopamine","Methoxyacetic acid","Ogremorphin","Triademenol","Cyclophosphamide","Methotrexate", "Valproic acid", "5-Flurouracil","Untreated", "Hydrogen Peroxide"), check.names = F)
+  heat_df3 <- eventReactive(input$go_heat3, {
+    df = counts %>% dplyr::filter(sample_id %in% input$tox_choice3 & Geneid %in% input$mirs_choice)
+    mat2 = df %>% dplyr::select(-sample_rep) %>% dplyr::group_by(Geneid, sample_id)  %>% dplyr::summarise(median = median(norm_count)) %>%
+      tidyr::pivot_wider(names_from = sample_id, values_from = median) %>% tibble::column_to_rownames(var = "Geneid") %>% as.matrix()
+    heat = t(scale(t(mat2[,1:ncol(mat2)]))) # calculates the z-score of samples starting in column 1
+    heat = na.omit(heat)
+    anno = data.frame(Treatment = colnames(heat), check.names = F)
     row.names(anno) <- colnames(heat)
-    pheatmap(heat, annotation_col = anno, show_rownames = T, treeheight_row = 0, main = "miRNAs")
+    pheatmap(heat, annotation_col = anno, show_rownames = T, treeheight_row = 0, main = "Median normalized counts for select miRNAs")
   })
   
   output$heatmap3 <- renderPlot({
@@ -755,13 +755,21 @@ server <- function(input, output, session) {
       res <- setReadable(res, OrgDb = org.Hs.eg.db, keyType="ENTREZID")
     } else if (input$ont %in% "REACTOME"){
       res <- enrichPathway(gene=unique(mirnet_targets()$TargetID), pvalueCutoff = 0.05, readable=TRUE)
-    } else {
+    } else if (input$ont %in% "Disease") {
       res <- enrichDO(gene          = unique(mirnet_targets()$TargetID),
                       ont           = "DO",
                       pvalueCutoff  = 0.05,
                       pAdjustMethod = "BH",
                       minGSSize     = 5,
                       maxGSSize     = 500,
+                      qvalueCutoff  = 0.05,
+                      readable      = TRUE)
+    } else {
+      res <- enrichGO(gene          = unique(mirnet_targets()$TargetID),
+                      OrgDb         = org.Hs.eg.db,
+                      ont           = "BP",
+                      pAdjustMethod = "BH",
+                      pvalueCutoff  = 0.05,
                       qvalueCutoff  = 0.05,
                       readable      = TRUE)
     }
