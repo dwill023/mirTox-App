@@ -41,7 +41,8 @@ set.seed(99)
 # load data used in app
 counts = readRDS("./data/counts_new.rds") # this is the normalized counts by DESeq2
 DEG = readRDS("./data/DEG_list.rds") # this is a list of the DEG for the 9 treatments.
-counts_rna = readRDS("./data/Norm_counts_rnaseq.rds") # normalized counts for RNA-seq
+counts_rna = readRDS("./data/Norm_counts_rnaseq.rds") # MATRIX normalized counts for RNA-seq
+counts_rna2 = readRDS("./data/counts_new_mrna.rds") # counts with sample_id added
 DEG_rna = readRDS("./data/DEG_rnaseq.rds") # DEG for RNA-seq
 
 
@@ -87,7 +88,7 @@ sidebar <- bs4DashSidebar(skin = "light",
                           bs4SidebarMenu(id = "sidebar", # id important for updateTabItems,
                                                       bs4SidebarMenuItem("Introduction", tabName = "Intro", icon = icon("info")),
                                                       bs4SidebarMenuItem("miRNA expression", tabName = "mirs", icon = icon("monero")),
-                                                      #bs4SidebarMenuItem("mRNA expression", tabName = "mrna", icon = icon("openid")),
+                                                      bs4SidebarMenuItem("mRNA expression", tabName = "mrna", icon = icon("dna")),
                                                       bs4SidebarMenuItem("Correlation Analysis", tabName = "corr_tab", icon = icon("braille"))
                                                       #bs4SidebarMenuItem("Pathway analysis", tabName = "pathways", icon = icon("connectdevelop"))
 ))
@@ -214,14 +215,14 @@ body <- bs4DashBody(
                                                                   pickerInput("tox_choice1", label = "Choice of Toxicants", choices = unique(counts$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
                                                            column(3,
                                                                   actionBttn("go_heat1", "Plot", style = "jelly", color="danger"))),
-                                                  plotOutput("heatmap1", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1, color = "#343a40"),
+                                                  plotOutput("heatmap1", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1),
                                                   downloadButton("downheat1", "Download Plot", icon=icon("download", lib = "font-awesome"))),
                                          tabPanel("Median Counts",
                                                   fluidRow(column(4,
                                                                   pickerInput("tox_choice2", label = "Choice of Toxicants", choices = unique(counts$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
                                                            column(3,
                                                                   actionBttn("go_heat2", "Plot", style = "jelly", color="danger"))),
-                                                  plotOutput("heatmap2", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1, color = "#343a40"),
+                                                  plotOutput("heatmap2", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1),
                                                   downloadButton("downheat2", "Download Plot", icon=icon("download", lib = "font-awesome"))),
                                          tabPanel("Selected miRNAs",
                                                   fluidRow(column(4,
@@ -230,7 +231,7 @@ body <- bs4DashBody(
                                                                   pickerInput("mirs_choice", label = "Choice of microRNA", choices = unique(counts$Geneid), multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
                                                            column(3,
                                                                   actionBttn("go_heat3", "Plot", style = "jelly", color="danger"))),
-                                                  plotOutput("heatmap3", width = "100%", height = "700px") %>% withSpinner(type = 6, size=1, color = "#343a40"),
+                                                  plotOutput("heatmap3", width = "100%", height = "700px") %>% withSpinner(type = 6, size=1),
                                                   downloadButton("downheat3", "Download Plot", icon=icon("download", lib = "font-awesome"))))
                                   ))),
               fluidRow(column(12,
@@ -278,7 +279,8 @@ body <- bs4DashBody(
                                                                                           textAreaInput("mir_list", "Input custom microRNAs", placeholder = "hsa-miR-21-5p", cols=17, rows = 4, resize = "both"))))),
                                                       fluidRow(column(3,
                                                                       actionBttn("go5", "Get Table", style = "jelly", color="danger")),
-                                                               actionButton("resetAll", "Reset all")),
+                                                               column(3,
+                                                                      actionButton("resetAll", "Reset all", status = "warning"))),
                                                       br(),
                                                       shinycustomloader::withLoader(DT::DTOutput("targetstable",  height = "500px"), type = 'image', loader = 'coffee_loading.gif')),
                                              tabPanel(HTML('<h6 style="color:black;">Ontology</h6>'), value = "tab2",
@@ -308,6 +310,161 @@ body <- bs4DashBody(
               )
             ), # Tab2
     
+    #### mRNA TAB #######
+    bs4TabItem("mrna",
+               fluidPage(
+                 h3("mRNA Expression"),
+                 p("RNA-seq was performed on the same samples treated with the nine toxicants and analyzed below."),
+                 br(),
+                 fluidRow(column(4,
+                                 pickerInput("gene", label = "Choice of mRNA", choices= sort(unique(rownames(counts_rna))), multiple = F, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE)))
+                 ),
+                 fluidRow(column(6,
+                                 box(id = "count_box2", title = "Counts Plot", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "gray-dark",
+                                     plotlyOutput("plot2"))),
+                          column(6,
+                                 box(id="count_tab2", title = "Normalized Counts", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
+                                     DT::dataTableOutput("count_table_rna") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
+                 fluidRow(column(6,
+                                 box(id = "vol_box2", title = "Volcano Plot", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "gray-dark",
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "By default the mRNA chosen above will be labeled in the volcano plot.", interactive = TRUE, placement = "bottom"),
+                                     sidebar = boxSidebar(id = "box2side_2", 
+                                                          sliderTextInput("FC_gene", "Log2Fold-Change (absolute value)", choices = seq(from= 0, to= 4, by=0.5), grid = TRUE, selected = 1),
+                                                          pickerInput("FDR_gene", "False Discovery Rate", choices = c(0.1, 0.05, 0.01), selected = 0.05),
+                                                          radioGroupButtons("all2", "Label Points", choices = c("Default", "All Points", "Selected mRNAs"), selected = "Default",  individual = TRUE, checkIcon = list(yes = tags$i(class = "fa fa-circle", style = "color: steelblue"), no = tags$i(class = "fa fa-circle-o", style = "color: steelblue"))),
+                                                          shinyjs::hidden(div(id="list2", pickerInput("gene2", label = "Choice of mRNA", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))))
+                                                          
+                                     ),
+                                     pickerInput("tox_gene", label = "Choice of toxicant", choices = names(DEG_rna), selected = "Cyclopamine", multiple = F, options = list(style = "btn-light", `live-search` = TRUE)),
+                                     plotOutput("volcano_2"),
+                                     downloadButton("save_vol2", "Download Plot", icon=icon("download", lib = "font-awesome")))),
+                          column(6,
+                                 box(id = "volTable", title = "Table of DEGs in volcano plot", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white", 
+                                     DT::dataTableOutput("voltable_2") %>% withSpinner(type =6 , size=1, color = "#343a40"))
+                          )),
+                 fluidRow(column(6,
+                                 box(id = "upbox2", title = "Overlapping mRNAs", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Select a column in the plot to display the names of the overlapping mRNAs. These mRNAs will be displayed in the adjacent table.", interactive = TRUE, placement = "bottom"),
+                                     sidebar = boxSidebar(id = "box3side_2", 
+                                                          sliderTextInput("FC_gene2", "Log2Fold-Change (absolute value)", choices = seq(from= 0, to= 4, by=0.5), grid = TRUE, selected = 1),
+                                                          pickerInput("FDR_gene2", "False Discovery Rate", choices = c(0.1, 0.05, 0.01), selected = 0.05),
+                                                          radioGroupButtons("reg_gene", "Choose:", choices = c("Up-regulated", "Down-regulated"), individual = TRUE, checkIcon = list(
+                                                            yes = tags$i(class = "fa fa-circle", 
+                                                                         style = "color: teal"),
+                                                            no = tags$i(class = "fa fa-circle-o", 
+                                                                        style = "color: teal")))
+                                     ),
+                                     fluidRow(
+                                       column(3, pickerInput("combo_gene", label = HTML('<h6 style="color:black;">Choice of Toxicants</h6>'), choices = c("Cyclopamine","Methoxyacetic acid", "Ogremorphin", "Triademenol","Cyclophosphamide" ,"Methotrexate","Valproic acid","5-Flurouracil" ,"Hydrogen Peroxide"), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
+                                       column(3, actionBttn("go_gene", "Plot", style = "jelly", color="danger"))
+                                     ),
+                                     upsetjsOutput("upset_gene", width = "100%", height = "600px") %>% withSpinner(type = 6, size=1, color = "#343a40"),
+                                     fluidRow(
+                                       column(2, "Intersections"),
+                                       column(3, span(textOutput("clicked_2"), style ="color:black")),
+                                       column(7, span(textOutput("clickedElements_2"), style ="color:black"))
+                                     ))),
+                          column(6,
+                                 box(id = "upTable", title = "Overlapping mRNAs", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
+                                     DT::dataTableOutput("upsettable_gene") %>% withSpinner(type =6 , size=1, color = "#343a40")))
+                 ),
+                 fluidRow(column(12,
+                                 box(id="heatbox2", title = "Heatmaps", width = 12, height = "1000px", collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "gray-dark",
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Maximize box to view plot. <br>DESeq2's normalized counts are used to plot the heatmaps.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
+                                     tabBox(id = "gene_tabbox", width = 12, type = "pills", status = "gray-dark", solidHeader = T,  collapsible = F, background = "gray-dark",
+                                            tabPanel("All Counts",
+                                                     fluidRow(column(4,
+                                                                     pickerInput("tox_choice_gene", label = "Choice of Toxicants", choices = unique(counts_rna2$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
+                                                              column(3,
+                                                                     actionBttn("get_heat1", "Plot", style = "jelly", color="danger"))),
+                                                     plotOutput("heatmap1_gene", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1),
+                                                     downloadButton("downheat1_g", "Download Plot", icon=icon("download", lib = "font-awesome"))),
+                                            tabPanel("Median Counts",
+                                                     fluidRow(column(4,
+                                                                     pickerInput("tox_choice2_gene", label = "Choice of Toxicants", choices = unique(counts_rna2$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
+                                                              column(3,
+                                                                     actionBttn("get_heat2", "Plot", style = "jelly", color="danger"))),
+                                                     plotOutput("heatmap2_gene", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1),
+                                                     downloadButton("downheat2_g", "Download Plot", icon=icon("download", lib = "font-awesome"))),
+                                            tabPanel("Selected mRNAs",
+                                                     fluidRow(column(4,
+                                                                     pickerInput("tox_choice3_gene", label = "Choice of Toxicants", choices = unique(counts_rna2$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
+                                                              column(4,
+                                                                     pickerInput("gene_choice", label = "Choice of mRNA", choices = unique(counts_rna2$Gene), multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
+                                                              column(3,
+                                                                     actionBttn("get_heat3", "Plot", style = "jelly", color="danger"))),
+                                                     plotOutput("heatmap3_gene", width = "100%", height = "700px") %>% withSpinner(type = 6, size=1),
+                                                     downloadButton("downheat3_g", "Download Plot", icon=icon("download", lib = "font-awesome"))))
+                                 ))),
+                 fluidRow(column(12,
+                                 box(id = "radarbox2", title = "Radar Plots", width = 12, height = "1000px", collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "gray-dark",
+                                     tabBox(id = "tabbox4", width = 12, type = "pills", status = "gray-dark", solidHeader = T,  collapsible = F, background = "gray-dark",
+                                            tabPanel("Toxicants",
+                                                     fluidRow(column(4,
+                                                                     pickerInput("mrna_choice", label = "Choice of mRNA", choices = unique(counts_rna2$Gene), multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
+                                                              column(4,
+                                                                     pickerInput("tox2_g", label = "Choice of toxicant", choices = c("Cyclopamine","Methoxyacetic acid", "Ogremorphin", "Triademenol","Cyclophosphamide" ,"Methotrexate","Valproic acid","5-Flurouracil" ,"Hydrogen Peroxide"), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
+                                                              column(3,
+                                                                     actionBttn("get_rad1", "Plot", style = "jelly", color="danger"))),
+                                                     plotOutput("radar1_gene", width = "100%", height = "800px") %>% withSpinner(type = 6),
+                                                     downloadButton("downrad1_g", "Download Plot", icon=icon("download", lib = "font-awesome"))),
+                                            tabPanel("mRNAs",
+                                                     fluidRow(column(4,
+                                                                     pickerInput("mrna_choice2", label = "Choice of mRNA", choices = unique(counts_rna2$Gene), multiple = T, options = list("maxOptions" = 10, "maxOptionsText" = "Too many mRNAs, choose less.", "style" = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
+                                                              column(4,
+                                                                     pickerInput("tox3_g", label = "Choice of toxicant", choices = c("Cyclopamine","Methoxyacetic acid", "Ogremorphin", "Triademenol","Cyclophosphamide" ,"Methotrexate","Valproic acid","5-Flurouracil" ,"Hydrogen Peroxide"), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
+                                                              column(3,
+                                                                     actionBttn("get_rad2", "Plot", style = "jelly", color="danger"))),
+                                                     plotOutput("radar2_gene", width = "100%", height = "800px") %>% withSpinner(type = 6),
+                                                     downloadButton("downrad2_g", "Download Plot", icon=icon("download", lib = "font-awesome"))))))),
+                 fluidRow(column(12, div(id = "go_box_g",
+                                         tabBox(id = "tabbox5",title = "mRNA Gene Ontology", side= "right", width = 12, height = "1100px", type = "tabs", status = "primary", solidHeader = T,  collapsible = T, maximizable = T, background = "gray",
+                                                label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Choose a single toxicant or enter your own list of mRNAs to generate gene ontologies.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
+                                                tabPanel(HTML('<h6 style="color:black;">Gene Ontology</h6>'),
+                                                         fluidRow(column(3,
+                                                                         radioGroupButtons("in_choice", "Choice of input", choices = c("Toxicant", "Custom List"), status = "primary", individual = T, checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon"))))),
+                                                         shinyjs::hidden(div(id = "choice_c",
+                                                                             fluidRow(column(3,
+                                                                                             pickerInput("tox4_g", label = "Choice of toxicant", choices = names(DEG_rna), multiple = F, options = list(style = "btn-light", `live-search` = TRUE))),
+                                                                                      column(4,
+                                                                                             radioGroupButtons("gene_reg", "Choose:", choices = c("Up-regulated", "Down-regulated"), individual = TRUE, checkIcon = list(
+                                                                                               yes = tags$i(class = "fa fa-circle", 
+                                                                                                            style = "color: teal"),
+                                                                                               no = tags$i(class = "fa fa-circle-o", 
+                                                                                                           style = "color: teal"))))),
+                                                                             fluidRow(column(3,
+                                                                                             sliderTextInput("FC_gene3", "Log2Fold-Change (absolute value)", choices = seq(from= 0, to= 4, by=0.5), grid = TRUE, selected = 1)),
+                                                                                      column(3,
+                                                                                             pickerInput("FDR_gene3", "False Discovery Rate", choices = c(0.1, 0.05, 0.01), selected = 0.05))))),
+                                                         shinyjs::hidden(div(id = "choice_d",
+                                                                             fluidRow(column(4,
+                                                                                             textAreaInput("mrna_list", "Input custom mRNAs", placeholder = "ACTN1", cols=17, rows = 4, resize = "both"))))),
+                                                         fluidRow(column(5,
+                                                                         radioGroupButtons("ont_choice", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease", "GO:Biological Process", "WikiPathways"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
+                                                                  column(3,
+                                                                         actionBttn("get_go", "Get Table", style = "jelly", color="danger")),
+                                                                  column(3,
+                                                                         actionButton("resetAll2", "Reset all", status = "warning"))),
+                                                         br(),
+                                                         shinycustomloader::withLoader(DT::DTOutput("geneGOtable",  height = "500px"), type = 'image', loader = 'coffee_loading.gif')),
+                                                tabPanel(HTML('<h6 style="color:black;">Dot Plot</h6>'), value = "tab3g",
+                                                         fluidRow(column(5,
+                                                                         pickerInput("ont_pickg", label = "Choose Ontology", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
+                                                                  column(3,
+                                                                         actionBttn("get_dot", "Plot", style = "jelly", color="danger"))),
+                                                         plotOutput("ont_plot_gene", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
+                                                         downloadButton("downgo_g", "Download Plot", icon=icon("download", lib = "font-awesome"))),
+                                                tabPanel(HTML('<h6 style="color:black;">Bar Plot</h6>'), value = "tab4g",
+                                                         fluidRow(column(5,
+                                                                         pickerInput("ont_pick2g", label = "Choose Ontology", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
+                                                                  column(3,
+                                                                         actionBttn("get_bar", "Plot", style = "jelly", color="danger"))),
+                                                         plotOutput("ont_barplot_gene", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
+                                                         downloadButton("downgo2_g", "Download Plot", icon=icon("download", lib = "font-awesome")))
+                                         ))# div go_box_g
+                 )) # GO 
+               )), # Tab3
+    
     
     #### Correlation TAB #######
     bs4TabItem("corr_tab",
@@ -315,7 +472,7 @@ body <- bs4DashBody(
                  h4("Correlation Analysis"),
                  p("The differentially expressed microRNAs and their validated targets are intersected with the differentially expressed mRNAs within the corresponding treatment. 
                    The interseting genes are analyzed within the selected gene ontology. The ontology of interest can be chosen to obtain the specific gene set that is matched 
-                   back with the microRNA target. A Pearson correlation is calculated using the normalized counts for the replicate samples between the microRNA and its target within the RNA-seq. "),
+                   back with the microRNA target. A Pearson correlation is calculated using the log2 normalized counts for the replicate samples between the microRNA and its target within the RNA-seq. "),
                  fluidRow(column(3,
                                  pickerInput("tox3", label = "Choice of toxicant", choices = names(DEG), multiple = F, options = list(style = "btn-light", `live-search` = TRUE)))),
                  fluidRow(column(3,
@@ -341,13 +498,15 @@ body <- bs4DashBody(
                                      DT::dataTableOutput("venn_table") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
                  fluidRow(column(12,
                                  box("go_inter", title = "GO of Intersecting genes", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
-                                     fluidRow(column(6,
-                                                     radioGroupButtons("ont2", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease", "GO:BP", "WikiPathways"), status = "warning", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon"))))),
-                                     fluidRow(column(3,
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Click on a GO description in the table to generate correlations between the microRNA and the mRNA. This correlation table is shown below", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
+                                     fluidRow(column(5,
+                                                     radioGroupButtons("ont2", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease", "GO:BP", "WikiPathways"), status = "warning", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
+                                              column(2,
                                                      actionBttn("go10", "Get Table", style = "jelly", color="danger"))),
                                      DT::dataTableOutput("inter_table") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
                  fluidRow(column(12,
                                  box("corrT_box", title = "Correlation Table", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Click on a row in the table to generate a correlation plot between the mRNA and microRNA. Plot is shown below.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                      DT::dataTableOutput("corr_table") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
                  fluidRow(column(12,
                                  box("cor_box", title = "Correlation Plot", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
@@ -904,6 +1063,484 @@ server <- function(input, output, session) {
     }
   )
   
+  #### mRNA TAB #######
+  
+  output$plot2 <- renderPlotly({
+    df = counts_rna2 %>% filter(Gene %in% input$gene)
+    color2 = paletteer_d("ggthemes::Superfishel_Stone")
+    cols = as.character(color2)
+    xform <- list(categoryorder = "array", categoryarray = c("Untreated", "Cyclopamine","Methoxyacetic acid","Ogremorphin","Triademenol", "Cyclophosphamide","Methotrexate","Valproic acid","5-Flurouracil","Hydrogen Peroxide"), title ="", tickangle=45)
+    p = plot_ly(
+      data=df,
+      x = ~sample_id,
+      y = ~norm_count,
+      color = ~sample_id,
+      colors = cols,
+      type= 'box',
+      boxpoints = "all",
+      pointpos = 0,
+      text = ~paste("Sample: ", sample_rep , "<br>Count: ", round(norm_count, 3)),
+      hoverinfo = "text"
+    ) %>%
+      layout(title = paste0('mRNA expression for ', input$gene), xaxis = xform, yaxis = list(title = 'Normalized Counts (DESeq2)'), legend = list(title=list(text='<b> Treatments </b>'), orientation = 'h', x = 0.1, y = -0.5))
+  })
+  
+  output$count_table_rna <- renderDataTable({
+    df = counts_rna2 %>% filter(Gene %in% input$gene)
+  }, extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
+                                                                                                                                                    buttons = c("csv", "excel", "pdf"),
+                                                                                                                                                    text = "Download")),
+                                                                                            pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+  
+  ##### volano #######
+  vol_2 <- reactive({
+    df = DEG_rna[[input$tox_gene]]
+    df$log2FoldChange = as.numeric(df$log2FoldChange)
+    
+    if(input$all2 == "All Points"){
+      opt = NULL
+    } else if(input$all2 == "Selected mRNAs"){
+      opt = input$gene2
+    } else if(input$all2 == "Default"){
+      opt = input$gene
+    }
+    
+    EnhancedVolcano(df,
+                    lab = df$Gene,
+                    x = 'log2FoldChange',
+                    y = 'padj',
+                    selectLab = opt,
+                    xlab = bquote(~Log[2]~ 'fold change'),
+                    ylab = bquote(~-Log[10] ~ italic(P-adjusted(BH))),
+                    axisLabSize = 12,
+                    pCutoff = as.numeric(input$FDR_gene),
+                    FCcutoff = input$FC_gene,
+                    pointSize = 4.0,
+                    labSize = 6,
+                    labFace = 'bold',
+                    colAlpha = 0.5,
+                    boxedLabels = TRUE,
+                    legendPosition ='bottom',
+                    legendLabSize = 12,
+                    legendIconSize = 4.0,
+                    drawConnectors = TRUE,
+                    max.overlaps = 20,
+                    widthConnectors = 1,
+                    lengthConnectors = unit(0.02, "npc"),
+                    colConnectors = 'black',
+                    title = paste0("DEG for ", input$tox_gene), subtitle = "mRNA-seq",
+                    titleLabSize = 14, subtitleLabSize = 9, captionLabSize = 12)
+  })
+  
+  observe({
+    shinyjs::toggle(id = "list2", condition = {input$all2 == "Selected mRNAs"})
+  })
+  
+  observe({
+    df = DEG_rna[[input$tox_gene]]
+    df = df %>% dplyr::filter(padj < as.numeric(input$FDR_gene) & (log2FoldChange > input$FC_gene | log2FoldChange < -input$FC_gene))
+    updatePickerInput(session, "gene2", choices = unique(df$Gene))
+  })
+  
+  output$volcano_2 <- renderPlot({
+    vol_2()
+  })
+  
+  #download handler to generate plotdownload
+  output$save_vol2 <- downloadHandler(filename = function() { paste("mRNA_volcano", "png", sep =".")},
+                                 content = function(file) { ggsave(file, plot = vol_2(), width = 13, height = 7, units = "in", device = "png")}
+  )
+  
+  output$voltable_2 <- renderDataTable({
+    df = DEG_rna[[input$tox_gene]]
+    df = df %>% dplyr::filter(padj < as.numeric(input$FDR_gene) & (log2FoldChange > input$FC_gene | log2FoldChange < -input$FC_gene))
+  }, extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
+                                                                                                                                                    buttons = c("csv", "excel", "pdf"),
+                                                                                                                                                    text = "Download")),
+                                                                                            pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+  
+  ##### upset #######
+  # upset plot for mRNA overlapping in treatments
+  
+  combo_df2 <- eventReactive(input$go_gene, {
+    df = DEG_rna[input$combo_gene]
+    if (input$reg_gene == "Up-regulated"){
+      filtered_list = lapply(df, dplyr::filter, padj < as.numeric(input$FDR_gene2) & (log2FoldChange > input$FC_gene2))
+    } else {
+      filtered_list = lapply(df, dplyr::filter, padj < as.numeric(input$FDR_gene2) & (log2FoldChange < -input$FC_gene2))
+    }
+    filtered_list
+  })
+  
+  upset_df_gene <- eventReactive(input$go_gene,{
+    filtered_final = lapply(combo_df2(), dplyr::select, Gene)
+    filtered_final = lapply(filtered_final, unlist, use.names= FALSE)
+    color_g = list("Cyclopamine" = '#65A479',
+                   "Methoxyacetic acid" = '#65A479',
+                   "Ogremorphin" = '#65A479',
+                   "Triademenol" = '#65A479',
+                   "Cyclophosphamide" = '#5D8CA8',
+                   "Methotrexate" = '#5D8CA8',
+                   "Valproic acid" = '#5D8CA8',
+                   "5-Flurouracil" = '#D3BA68',
+                   "Hydrogen Peroxide" = '#D5695D')
+    upsetjs() %>% fromList(filtered_final, colors = color_g) %>% generateDistinctIntersections(limit = 60) %>% chartLabels(title = paste0(input$reg_gene, " mRNAs")) %>% chartLayout(set.label.alignment = "left")  %>% interactiveChart()
+  })
+  
+  output$upset_gene <- renderUpsetjs({
+    upset_df_gene()
+  })
+  
+  
+  output$clicked_2 <- renderText({
+    # click event: <id>_hover -> list(name="NAME" or NULL, elems=c(...))
+    input$upset_gene_click$name
+  })
+  output$clickedElements_2 <- renderText({
+    as.character(input$upset_gene_click$elems)
+  })
+  
+  output$upsettable_gene <- renderDataTable({
+    df = bind_rows(combo_df2(), .id = "column_label")
+    df2 = df %>% dplyr::filter(Gene %in% as.character(input$upset_gene_click$elems))
+  }, extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
+                                                                                                                                                    buttons = c("csv", "excel", "pdf"),
+                                                                                                                                                    text = "Download")),
+                                                                                            pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+  
+  ##### Heatmap #######
+  
+  
+  heat_df1g <- eventReactive(input$get_heat1, {
+    filt_counts = counts_rna2 %>% dplyr::filter(sample_id %in% input$tox_choice_gene)
+    mat = filt_counts %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% tibble::column_to_rownames(var = "Gene") %>% as.matrix()
+    heat = t(scale(t(mat[,1:ncol(mat)]))) # calculates the z-score of samples starting in column 1  
+    heat = na.omit(heat)
+    
+    choices = input$tox_choice_gene
+    treatments = c()
+    for(i in choices){
+      if(i == "Untreated"){
+        t = rep(i, 6)
+      }else {
+        t = rep(i, 3)
+      }
+      treatments = c(treatments, t)
+    }
+    anno = data.frame(Treatment = treatments, check.names = F)
+    row.names(anno) <- colnames(heat)
+    pheatmap(heat, annotation_col = anno, show_rownames = F, treeheight_row = 0, main = "Normalized counts for all mRNAs")
+  })
+  
+  output$heatmap1_gene <- renderPlot({
+    heat_df1g()
+  })
+  
+  #download handler to generate plotdownload
+  output$downheat1_g <- downloadHandler(
+    filename = function() { paste("mRNA_heatmap_all", "png", sep =".")},
+    content = function(file) {
+      ggsave(file, plot = heat_df1g(), width = 11, height = 14, units = "in", device = "png")
+    }
+  )
+  
+  heat_df2g <- eventReactive(input$get_heat2, {
+    filt_counts = counts_rna2 %>% dplyr::filter(sample_id %in% input$tox_choice2_gene)
+    median_counts = filt_counts %>% dplyr::select(-sample_rep) %>% dplyr::group_by(Gene, sample_id)  %>% dplyr::summarise(median = median(norm_count)) %>%
+      tidyr::pivot_wider(names_from = sample_id, values_from = median) %>% tibble::column_to_rownames(var = "Gene") %>% as.matrix()
+    
+    heat = t(scale(t(median_counts[,1:ncol(median_counts )]))) # calculates the z-score of samples starting in column 1  
+    heat = na.omit(heat) # remove NaN values if any
+    
+    anno = data.frame(Treatment = colnames(heat), check.names = F)
+    row.names(anno) <- colnames(heat)
+    
+    pheatmap(heat, annotation_col = anno, show_rownames = F, treeheight_row = 0, main = "Median normalized counts for all mRNAs")
+  })
+  
+  output$heatmap2_gene <- renderPlot({
+    heat_df2g()
+  })
+  
+  #download handler to generate plotdownload
+  output$downheat2_g <- downloadHandler(
+    filename = function() { paste("mRNA_heatmap_median", "png", sep =".")},
+    content = function(file) {
+      ggsave(file, plot = heat_df2g(), width = 11, height = 14, units = "in", device = "png")
+    }
+  )
+  
+  heat_df3g <- eventReactive(input$get_heat3, {
+    df = counts_rna2 %>% dplyr::filter(sample_id %in% input$tox_choice3_gene & Gene %in% input$gene_choice)
+    mat2 = df %>% dplyr::select(-sample_rep) %>% dplyr::group_by(Gene, sample_id)  %>% dplyr::summarise(median = median(norm_count)) %>%
+      tidyr::pivot_wider(names_from = sample_id, values_from = median) %>% tibble::column_to_rownames(var = "Gene") %>% as.matrix()
+    heat = t(scale(t(mat2[,1:ncol(mat2)]))) # calculates the z-score of samples starting in column 1
+    heat = na.omit(heat)
+    anno = data.frame(Treatment = colnames(heat), check.names = F)
+    row.names(anno) <- colnames(heat)
+    pheatmap(heat, annotation_col = anno, show_rownames = T, treeheight_row = 0, main = "Median normalized counts for select mRNAs")
+  })
+  
+  output$heatmap3_gene <- renderPlot({
+    heat_df3g()
+  })
+  
+  #download handler to generate plotdownload
+  output$downheat3_g <- downloadHandler(
+    filename = function() { paste("mRNA_heatmap_selected", "png", sep =".")},
+    content = function(file) {
+      ggsave(file, plot = heat_df3g(), width = 11, height = 14, units = "in", device = "png")
+    }
+  )
+  
+  
+  ##### Radar plot #######
+  
+  rad1_gene <- eventReactive(input$get_rad1, {
+    DEG = bind_rows(DEG_rna, .id = "toxicants")
+    DEG = DEG %>% filter(Gene %in% input$mrna_choice & toxicants %in% input$tox2_g)
+    DEG = DEG %>% dplyr::arrange(desc(log2FoldChange))
+    DEG = DEG %>% dplyr::select(-padj) %>% tidyr::pivot_wider(names_from = Gene, values_from = log2FoldChange) %>% tibble::column_to_rownames(var = "toxicants")
+    DEG <- rbind(rep(max(DEG),ncol(DEG)) , rep(min(DEG),ncol(DEG)) , DEG)
+    DEG
+  })
+  
+  output$radar1_gene <- renderPlot({
+    validate(
+      need(input$mrna_choice >= 3, "Select at least three mRNAs.")
+    )
+    colors = paletteer_d("ggthemes::Tableau_10")
+    radarchart(rad1_gene(), axistype=1,
+               #custom polygon
+               pcol=colors , plwd=2 , plty=1, pfcol = scales::alpha(colors, 0.25),
+               #custom the grid
+               cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,20,5), cglwd=0.8,
+               #custom labels
+               vlcex=1.3,
+               title = "Generated using log2FoldChange")
+    # Add a legend
+    legend(x=1.3, y=1, legend = rownames(rad1_gene()[-c(1,2),]), bty = "n", pch=20 , col=colors , text.col = "black", cex=1.2, pt.cex=3)
+  })
+  
+  output$downrad1_g <- downloadHandler(
+    filename = function() { paste("mRNA_radar_tox", "png", sep =".")},
+    content = function(file) {
+      png(file, width = 1200, height = 800, units = "px", res = 72, type = "cairo-png")
+      colors = paletteer_d("ggthemes::Tableau_10")
+      radarchart(rad1_gene(), axistype=1,
+                 #custom polygon
+                 pcol=colors , plwd=2 , plty=1, pfcol = scales::alpha(colors, 0.25),
+                 #custom the grid
+                 cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,20,5), cglwd=0.8,
+                 #custom labels
+                 vlcex=1.3,
+                 title = "Generated using log2FoldChange")
+      # Add a legend
+      legend(x=1.3, y=1, legend = rownames(rad1_gene()[-c(1,2),]), bty = "n", pch=20 , col=colors , text.col = "black", cex=1.2, pt.cex=3)
+      dev.off()
+    }
+  )
+  
+  rad2_gene <- eventReactive(input$get_rad2,{
+    DEG = bind_rows(DEG_rna, .id = "toxicants")
+    DEG = DEG %>% filter(Gene %in% input$mrna_choice2 & toxicants %in% input$tox3_g)
+    DEG = DEG %>% dplyr::arrange(desc(log2FoldChange))
+    DEG = DEG %>% dplyr::select(-padj) %>% tidyr::pivot_wider(names_from = toxicants, values_from = log2FoldChange) %>% tibble::column_to_rownames(var = "Gene")
+    DEG <- rbind(rep(max(DEG),ncol(DEG)) , rep(min(DEG),ncol(DEG)) , DEG)
+    DEG
+  })  
+  
+  
+  output$radar2_gene <- renderPlot({
+    validate(
+      need(input$tox3_g >= 3, "Select at least three toxicants.")
+    )
+    colors = paletteer_d("ggthemes::Tableau_10")
+    radarchart(rad2_gene()  , axistype=1 , 
+               #custom polygon
+               pcol=colors , plwd=2 , plty=1, pfcol = scales::alpha(colors, 0.25),
+               #custom the grid
+               cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,20,5), cglwd=0.8,
+               #custom labels
+               vlcex=1.5,
+               title = "Generated using log2FoldChange")
+    
+    # Add a legend
+    legend(x=1.3, y=1, legend = rownames(rad2_gene()[-c(1,2),]), bty = "n", pch=20 , col=colors , text.col = "black", cex=1.2, pt.cex=3)
+  })
+  
+  output$downrad2_g <- downloadHandler(
+    filename = function() { paste("mRNA_radar_tox", "png", sep =".")},
+    content = function(file) {
+      png(file, width = 1200, height = 800, units = "px", res = 72, type = "cairo-png")
+      colors = paletteer_d("ggthemes::Tableau_10")
+      radarchart(rad2_gene()  , axistype=1 , 
+                  #custom polygon
+                  pcol=colors , plwd=2 , plty=1, pfcol = scales::alpha(colors, 0.25),
+                  #custom the grid
+                  cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,20,5), cglwd=0.8,
+                  #custom labels
+                  vlcex=1.3,
+                  title = "Generated using log2FoldChange")
+      
+      # Add a legend
+      legend(x=1.3, y=1, legend = rownames(rad2_gene()[-c(1,2),]), bty = "n", pch=20 , col=colors , text.col = "black", cex=1.2, pt.cex=3)
+      dev.off()
+    }
+  )
+  
+  ##### GO #######
+  
+  # hide the other two tabs that depend on values generated in the first tab
+  observe({
+    hide(selector = "#tabbox5 li a[data-value=tab3g]")
+    hide(selector = "#tabbox5 li a[data-value=tab4g]")
+  })
+  
+  observe({
+    toggle(id = "choice_c", condition = {input$in_choice %in% "Toxicant"})
+    toggle(id = "choice_d", condition = {input$in_choice %in% "Custom List"})
+  })
+  
+  observeEvent(input$resetAll2, {
+    reset("go_box")
+    hide(selector = "#tabbox5 li a[data-value=tab3g]")
+    hide(selector = "#tabbox5 li a[data-value=tab4g]")
+  })
+  
+  mrna_choice <- reactive({
+    if(input$in_choice %in% "Toxicant"){
+      df = DEG_rna[[input$tox4_g]]
+      if (input$gene_reg == "Up-regulated"){
+        gene_list = df %>% dplyr::filter(padj < as.numeric(input$FDR_gene3) & (log2FoldChange > input$FC_gene3))
+        genes = gene_list$Gene
+      } else {
+        gene_list = df %>% dplyr::filter(padj < as.numeric(input$FDR_gene3) & (log2FoldChange < -input$FC_gene3))
+        genes = gene_list$Gene
+      }
+    } else {
+      genes = scan(text = input$mrna_list, what = "")
+    }
+    genes
+  })
+  
+  
+  # once the get table button on the first tab is clicked, reveal the other three tabs.
+  observeEvent(input$get_go, {
+    shinyjs::toggle(selector = "#tabbox5 li a[data-value=tab3g]")
+    shinyjs::toggle(selector = "#tabbox5 li a[data-value=tab4g]")
+  })
+  
+  
+  go_table_g <- eventReactive(input$get_go, {
+    gene_id = clusterProfiler::bitr(unique(mrna_choice()), fromType = "SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+    if (input$ont_choice %in% "KEGG"){
+      res <- enrichKEGG(gene         = gene_id$ENTREZID,
+                        organism     = 'hsa',
+                        pvalueCutoff = 0.05)
+      
+      res <- setReadable(res, OrgDb = org.Hs.eg.db, keyType="ENTREZID")
+    } else if (input$ont_choice %in% "REACTOME"){
+      res <- enrichPathway(gene=gene_id$ENTREZID, pvalueCutoff = 0.05, readable=TRUE)
+    } else if (input$ont_choice %in% "Disease") {
+      res <- enrichDO(gene          = gene_id$ENTREZID,
+                      ont           = "DO",
+                      pvalueCutoff  = 0.05,
+                      pAdjustMethod = "BH",
+                      minGSSize     = 5,
+                      maxGSSize     = 500,
+                      qvalueCutoff  = 0.05,
+                      readable      = TRUE)
+    } else if (input$ont_choice %in% "GO:Biological Process"){
+      res <- enrichGO(gene          = gene_id$ENTREZID,
+                      OrgDb         = org.Hs.eg.db,
+                      ont           = "BP",
+                      pAdjustMethod = "BH",
+                      pvalueCutoff  = 0.05,
+                      qvalueCutoff  = 0.05,
+                      readable      = TRUE)
+    } else {
+      res <- enrichWP(gene = gene_id$ENTREZID,
+                      organism = "Homo sapiens",
+                      pvalueCutoff = 0.05,
+                      pAdjustMethod = "BH")
+      
+      res <- setReadable(res, OrgDb = org.Hs.eg.db, keyType="ENTREZID")
+    }
+    res <- as.data.frame(res)
+    res <- res %>% dplyr::filter(p.adjust < 0.05) %>% dplyr::select(ID, Description, GeneRatio, pvalue, p.adjust, geneID, Count) %>% dplyr::mutate(GeneRatio = DOSE::parse_ratio(GeneRatio))
+  })
+  
+  output$geneGOtable <- renderDT({
+    datatable(go_table_g(), extensions =c("Buttons", 'Responsive'), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
+                                                                                                                                                                                       buttons = c("csv", "excel", "pdf"),
+                                                                                                                                                                                       text = "Download")),
+                                                                                                                               pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+    
+  })
+  
+  # use the ontologies generated above as choices to plot
+  observe({
+    df = go_table_g()$Description
+    updatePickerInput(session, "ont_pickg", choices = unique(df))
+  })
+  
+  go_plotg <- eventReactive(input$get_dot, {
+    path.table = go_table_g() %>% dplyr::filter(Description %in% input$ont_pickg)
+    p <- ggplot(path.table, aes(GeneRatio, forcats::fct_reorder(Description, GeneRatio))) +
+      geom_point(aes(color=p.adjust, size = Count), position = position_jitter(width = 0.01, height = 0.01)) + 
+      scale_color_viridis() +
+      scale_size(range = c(2,10)) +
+      theme_bw() +
+      xlab("GeneRatio") + ylab(NULL) +
+      ggtitle(paste0(ifelse(input$in_choice %in% "Toxicant", input$tox4_g, input$in_choice), " ", ifelse(input$in_choice %in% "Toxicant", input$gene_reg, "of"), " mRNAs in ", input$ont_choice, " ontologies"))
+    p
+  })
+  
+  output$ont_plot_gene <- renderPlot({
+    go_plotg()
+  })
+  
+  #download handler to generate plotdownload
+  output$downgo_g <- downloadHandler(
+    filename = function(){ paste0("GO_dotplot", ".png")},
+    content = function(file) {
+      ggplot2::ggsave(file, plot = go_plotg(), width = 8, height = 11, units = "in", device = "png")
+    }
+  )
+  
+  # use the ontologies generated as choices to plot
+  observe({
+    df = go_table_g()$Description
+    updatePickerInput(session, "ont_pick2g", choices = unique(df))
+  })
+  
+  go_plotbar_g <- eventReactive(input$get_bar, {
+    path.table = go_table_g() %>% dplyr::filter(Description %in% input$ont_pick2g) %>% dplyr::mutate(negative_log10_of_adjusted_p_value = -log10(p.adjust))
+    colors <- unikn::usecol(pal = pal_petrol, n=19)
+    p =  ggplot(path.table, aes(forcats::fct_reorder(Description, negative_log10_of_adjusted_p_value), negative_log10_of_adjusted_p_value)) +
+      geom_col(aes(fill=negative_log10_of_adjusted_p_value)) +
+      scale_fill_gradientn(colors = colors) +
+      coord_flip() +
+      labs(title = paste0(ifelse(input$in_choice %in% "Toxicant", input$tox4_g, input$in_choice), " ", ifelse(input$in_choice %in% "Toxicant", input$gene_reg, "of"), " mRNAs in ", input$ont_choice, " ontologies"),
+           x= NULL, y = expression("-Log"[10]*"(adjusted p-value)"), fill = expression("-Log"[10]*"(p.adjust)")) +
+      ds4psy::theme_ds4psy(col_title = "#37474f" , col_brdrs = "#37474f")
+    p
+  })
+  
+  output$ont_barplot_gene <- renderPlot({
+    go_plotbar_g()
+  })
+  
+  #download handler to generate plotdownload
+  output$downgo2_g <- downloadHandler(
+    filename = function(){ paste0("GO_barplot", ".png")},
+    content = function(file) {
+      ggplot2::ggsave(file, plot = go_plotbar_g(), width = 14, height = 11, units = "in", device = "png", bg = "white")
+    }
+  )
+  
+  
   #### Correlation TAB #######
   
   mir_targets <- eventReactive(input$go9, {
@@ -945,7 +1582,7 @@ server <- function(input, output, session) {
                    "mRNA" = '#9a8c98')
     upsetjsVennDiagram( width = "90%") %>%
       fromList(listInput, colors = color_g) %>%
-      chartVennLabels(title = "Cyclopamine intersection", description = "this is a long chart description")  %>% 
+      chartVennLabels(title = paste0(input$tox3, " intersection"), description = paste0(input$mir_reg, " microRNA validated targets overlapping ", input$rna_reg, " mRNAs"))  %>% 
       chartTheme(selection.color= "#f5cb5c", has.selection.opacity=0.3) %>%
       interactiveChart()
   })
@@ -1052,7 +1689,23 @@ server <- function(input, output, session) {
     df3
   })
   
-  output$corr_table <- renderDT({df3() %>% DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list( "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
+  output$corr_table <- renderDT({
+    sketch = htmltools::withTags(table(
+      class = 'display',
+      thead(
+        tr(
+          th(rowspan = 2, 'microRNA'),
+          th(rowspan = 2, 'mRNA'),
+          th(colspan = 3, 'MicroRNA Counts'),
+          th(colspan = 3, 'mRNA Counts')
+        ),
+        tr(
+          lapply(names(df3())[-c(1,2)], th)
+        )
+      )
+    ))
+    df3() %>% 
+      DT::datatable(container = sketch, extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list( "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
     })
   
   plot_df <- eventReactive(input$corr_table_rows_selected, {
@@ -1075,7 +1728,7 @@ server <- function(input, output, session) {
   output$downcorr <- downloadHandler(
     filename = function(){ paste0("corr_plot", ".png")},
     content = function(file) {
-      ggplot2::ggsave(file, plot = plot_df(), width = 8, height = 10, units = "in", device = "png", bg = "white")
+      ggplot2::ggsave(file, plot = plot_df(), width = 11, height = 8, units = "in", device = "png", bg = "white")
     }
   )
 
