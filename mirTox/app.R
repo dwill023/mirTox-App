@@ -98,6 +98,7 @@ sidebar <- bs4DashSidebar(skin = "light",
 
 
 body <- bs4DashBody(
+  includeCSS('style.css'),
   fresh::use_theme(mytheme),
   useShinyjs(),
   tags$head(
@@ -474,13 +475,13 @@ body <- bs4DashBody(
                    The interseting genes are analyzed within the selected gene ontology. The ontology of interest can be chosen to obtain the specific gene set that is matched 
                    back with the microRNA target. A Pearson correlation is calculated using the log2 normalized counts for the replicate samples between the microRNA and its target within the RNA-seq. "),
                  fluidRow(column(3,
-                                 pickerInput("tox3", label = "Choice of toxicant", choices = names(DEG), multiple = F, options = list(style = "btn-light", `live-search` = TRUE)))),
+                                 pickerInput("tox3", label = "Choice of toxicant", choices = names(DEG), multiple = T, options = list(style = "btn-light", `live-search` = TRUE)))),
                  fluidRow(column(3,
                                  sliderTextInput("FC_4", "Log2Fold-Change (absolute value)", choices = seq(from= 0, to= 4, by=0.5), grid = TRUE, selected = 1)),
                           column(3,
                                  pickerInput("FDR_4", "False Discovery Rate", choices = c(0.1, 0.05, 0.01), selected = 0.05))),
                  fluidRow(column(4,
-                                 prettyRadioButtons(inputId = "mir_reg", label = "microRNA regulation", choices = c("Up-regulated", "Down-regulated"), icon = icon("check"), bigger = TRUE, status = "success", inline = TRUE, animation = "jelly")),
+                                 prettyRadioButtons(inputId = "mir_reg", label = "microRNA regulation", choices = c("Up-regulated", "Down-regulated"), icon = icon("check"), bigger = TRUE,  status = "success", inline = TRUE, animation = "jelly")),
                           column(4,
                                  prettyRadioButtons(inputId = "rna_reg", label = "mRNA regulation", choices = c("Up-regulated", "Down-regulated"), icon = icon("check"), bigger = TRUE, status = "warning", inline = TRUE, animation = "jelly")),
                           column(3,
@@ -664,7 +665,6 @@ server <- function(input, output, session) {
   
   upset_df <- eventReactive(input$go,{
     filtered_final = lapply(combo_df(), dplyr::select, microRNA)
-    filtered_final = lapply(filtered_final, as.list)
     filtered_final = lapply(filtered_final, unlist, use.names= FALSE)
     color_g = list("Cyclopamine" = '#65A479',
                    "Methoxyacetic acid" = '#65A479',
@@ -692,7 +692,7 @@ server <- function(input, output, session) {
   })
   
   output$upsettable <- renderDataTable({
-    df = bind_rows(combo_df(), .id = "column_label")
+    df = bind_rows(combo_df(), .id = "Toxicant")
     df2 = df %>% dplyr::filter(microRNA %in% as.character(input$upset1_click$elems))
   }, extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
                                                                                                                                                     buttons = c("csv", "excel", "pdf"),
@@ -943,9 +943,11 @@ server <- function(input, output, session) {
   })
   
   output$targetstable <- renderDT({
-    datatable(mirnet_targets(), rownames=F, filter="top",
-              extensions =c("Buttons"), options = list(dom = 'lBrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")),
-                                                       pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+    mirnet_targets() %>% 
+      dplyr::mutate(TargetID = paste0("<a href='","https://www.ncbi.nlm.nih.gov/gene/", TargetID, "' target='_blank'>", TargetID, "</a>")) %>%
+      dplyr::rename("microRNA" = "ID", "PMID" = "Literature", "Entrez Gene ID" = "TargetID") %>%
+      datatable(rownames=F, filter="top", escape = F, extensions =c("Buttons"), options = list(dom = 'lBrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")),
+                                                                                               pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
   })
   
   # once the get table button on the first tab is clicked, reveal the other three tabs.
@@ -995,7 +997,7 @@ server <- function(input, output, session) {
   })
   
   output$GOtable <- renderDT({
-    datatable(go_table(), extensions =c("Buttons", 'Responsive'), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
+    datatable(go_table(), extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, options = list(scrollX = TRUE, "dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
                                                                                                                                                                          buttons = c("csv", "excel", "pdf"),
                                                                                                                                                                          text = "Download")),
                                                                                                                  pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
@@ -1201,7 +1203,7 @@ server <- function(input, output, session) {
   })
   
   output$upsettable_gene <- renderDataTable({
-    df = bind_rows(combo_df2(), .id = "column_label")
+    df = bind_rows(combo_df2(), .id = "Toxicant")
     df2 = df %>% dplyr::filter(Gene %in% as.character(input$upset_gene_click$elems))
   }, extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
                                                                                                                                                     buttons = c("csv", "excel", "pdf"),
@@ -1542,15 +1544,18 @@ server <- function(input, output, session) {
   
   
   #### Correlation TAB #######
-  
+
+  # filter the miRs by the chosen FC & FDR then get their target genes
   mir_targets <- eventReactive(input$go9, {
-    df = DEG[[input$tox3]]
+    df = DEG[input$tox3]
+    df = bind_rows(df, .id = "Toxicant")
     if (input$mir_reg == "Up-regulated"){
-      filtered_mirs = df %>% dplyr::filter(padj < as.numeric(input$FDR_4) & (log2FoldChange > input$FC_4))
+      filtered_list = df %>% dplyr::filter(padj < as.numeric(input$FDR_4) & (log2FoldChange > input$FC_4))
     } else {
-      filtered_mirs = df %>% dplyr::filter(padj < as.numeric(input$FDR_4) & (log2FoldChange < -input$FC_4))
+      filtered_list = df %>% dplyr::filter(padj < as.numeric(input$FDR_4) & (log2FoldChange < -input$FC_4))
     }
-    mirs = tolower(filtered_mirs$microRNA)
+    mirs = filtered_list %>% dplyr::select(microRNA) %>% dplyr::distinct()
+    mirs = tolower(mirs$microRNA)
     #### Step 1. Initiate the dataSet object
     Init.Data("mir", "mirlist")
     #### Step 2. Set up the user input data
@@ -1560,11 +1565,15 @@ server <- function(input, output, session) {
     #### Step 4. Perform miRNAs to multiple targets mapping, results are downloaded in your working directory
     QueryMultiListMir()
     res = mir.resu %>% dplyr::select(-Tissue)
-    res
+    mir_df = filtered_list[,1:2] %>% dplyr::mutate(microRNA = tolower(microRNA))
+    final = left_join(res, mir_df, by = c("ID" ="microRNA"))
+    final
   })
   
+  # filter the differentially expressed mRNAs by the FC & FDR cutoff chosen 
   mrnas <- eventReactive(input$go9,{
-    df = DEG_rna[[input$tox3]]
+    df = DEG_rna[input$tox3]
+    df = bind_rows(df, .id = "Toxicant")
     if (input$rna_reg == "Up-regulated"){
       filtered_df = df %>% dplyr::filter(padj < as.numeric(input$FDR_4) & (log2FoldChange > input$FC_4))
     } else {
@@ -1573,22 +1582,33 @@ server <- function(input, output, session) {
     filtered_df
   })
   
-  venn_df <- eventReactive(input$go9,{
-    listInput <- list(
-      microRNA_targets = unique(mir_targets()$Target),
-      mRNA = unique(rownames(mrnas()))
-    )
-    color_g = list("microRNA_targets" = '#83c5be',
-                   "mRNA" = '#9a8c98')
-    upsetjsVennDiagram( width = "90%") %>%
-      fromList(listInput, colors = color_g) %>%
-      chartVennLabels(title = paste0(input$tox3, " intersection"), description = paste0(input$mir_reg, " microRNA validated targets overlapping ", input$rna_reg, " mRNAs"))  %>% 
-      chartTheme(selection.color= "#f5cb5c", has.selection.opacity=0.3) %>%
-      interactiveChart()
+  # join the mrnas with the mir_targets and take out any rows containing NAs (which are mrnas not associated with any microRNAs)
+  combo <- eventReactive(input$go9, {
+    df2 = left_join(mrnas()[,1:2], mir_targets(), by = c("Toxicant" = "Toxicant", "Gene" = "Target")) %>% na.omit()
+    df2
+  })
+  
+  upset_combo <- eventReactive(input$go9,{
+    df3 = combo() %>% dplyr::select(Toxicant, Gene) %>% dplyr::distinct()
+    data_list = split(df3, f=df3$Toxicant)
+    data_list = lapply(data_list, dplyr::select, Gene)
+    data = lapply(data_list, unlist, use.names= FALSE)
+    
+    color_g = list("Cyclopamine" = '#65A479',
+                   "Methoxyacetic acid" = '#65A479',
+                   "Ogremorphin" = '#65A479',
+                   "Triademenol" = '#65A479',
+                   "Cyclophosphamide" = '#5D8CA8',
+                   "Methotrexate" = '#5D8CA8',
+                   "Valproic acid" = '#5D8CA8',
+                   "5-Flurouracil" = '#D3BA68',
+                   "Hydrogen Peroxide" = '#D5695D')
+    upsetjs() %>% fromList(data, colors = color_g) %>% generateDistinctIntersections(limit = 60) %>% chartLabels(title = stringi::stri_wrap(glue::glue_collapse(names(data), sep = ", ", last = " & "), width = 30), description = paste0(input$mir_reg, " microRNAs whose targets overlap ", input$rna_reg, " mRNAs.")) %>% 
+      chartLayout(set.label.alignment = "left")  %>% interactiveChart()
   })
   
   output$venn <- renderUpsetjs({
-    venn_df()
+    upset_combo()
   })
   
   output$venn_clicked <- renderText({
@@ -1599,19 +1619,17 @@ server <- function(input, output, session) {
     as.character(input$venn_click$elems)
   })
   
-  output$venn_table <- renderDataTable({
-    combo = venn_df() %>% getCombinations()
-    intersection = combo[[3]]$elems
-    df2 = mir_targets() %>% dplyr::filter(Target %in% intersection)
-  }, extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
-                                                                                                                                                    buttons = c("csv", "excel", "pdf"),
-                                                                                                                                                    text = "Download")),
-                                                                                            pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+  output$venn_table <- renderDT({
+    validate(need(!is.null(input$venn_click$elems), message = "Click on an intersection in the upset plot to view table."))
+    combo() %>% dplyr::filter(Gene %in% as.character(input$venn_click$elems)) %>%
+      dplyr::mutate(TargetID = paste0("<a href='","https://www.ncbi.nlm.nih.gov/gene/", TargetID, "' target='_blank'>", TargetID, "</a>")) %>%
+      dplyr::rename("microRNA" = "ID", "PMID" = "Literature", "mRNA" = "Gene", "Entrez Gene ID" = "TargetID", "miR Accession" = "Accession") %>%
+      dplyr::select(Toxicant, microRNA, "miR Accession", mRNA, "Entrez Gene ID", Experiment, PMID) %>%
+      DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
+  })
   
   inter_go <- eventReactive(input$go10, {
-    combo = venn_df() %>% getCombinations()
-    intersection = combo[[3]]$elems
-    entrezid = mir_targets() %>% filter(Target %in% intersection) %>% dplyr::select(TargetID) %>% dplyr::distinct()
+    entrezid = combo() %>% filter(Gene %in% as.character(input$venn_click$elems)) %>% dplyr::select(TargetID) %>% dplyr::distinct()
     if (input$ont2 %in% "KEGG"){
       res <- enrichKEGG(gene         = entrezid$TargetID,
                         organism     = 'hsa',
@@ -1619,7 +1637,11 @@ server <- function(input, output, session) {
       
       res <- setReadable(res, OrgDb = org.Hs.eg.db, keyType="ENTREZID")
     } else if (input$ont2 %in% "REACTOME"){
-      res <- enrichPathway(gene=unique(mirnet_targets()$TargetID), pvalueCutoff = 0.05, readable=TRUE)
+      res <- enrichPathway(gene          = entrezid$TargetID,
+                           organism      = "human",
+                           pvalueCutoff  = 0.05,
+                           pAdjustMethod = "BH",
+                           readable      = TRUE)
     } else if (input$ont2 %in% "Disease") {
       res <- enrichDO(gene          = entrezid$TargetID,
                       ont           = "DO",
@@ -1651,69 +1673,70 @@ server <- function(input, output, session) {
   })
   
   output$inter_table <- renderDataTable({
-    inter_go()
-  }, extensions =c("Buttons", 'Responsive'), rownames = FALSE, filter = "top", escape = F, selection = "single", options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
+    inter_go() %>% dplyr::mutate(Description = paste0("<button class='table_btn' title='Click to get correlations below.'>", Description, "</button>"))
+  }, extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
                                                                                                                                                     buttons = c("csv", "excel", "pdf"),
                                                                                                                                                     text = "Download")),
                                                                                             pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+  # isolate the abbreviated name of tox treatments when the upset plot is clicked on
+  tox <- reactive({
+    combo = combo() %>% dplyr::filter(Gene %in% as.character(input$venn_click$elems)) %>% dplyr::select(Toxicant) %>% dplyr::distinct()
+    tox = ifelse(combo$Toxicant == "Cyclopamine", "CYCLO", ifelse(combo$Toxicant == "Methoxyacetic acid", "MAA", ifelse(combo$Toxicant == "Ogremorphin", "OGM", ifelse(combo$Toxicant == "Triademenol", "MENOL", ifelse(combo$Toxicant == "Cyclophosphamide", "CPA", ifelse(combo$Toxicant =="Methotrexate", "MTX", ifelse(combo$Toxicant == "Valproic acid", "VPA", ifelse(combo$Toxicant == "5-Flurouracil", "5FU", ifelse(combo$Toxicant == "Hydrogen Peroxide", "H2O2", "")))))))))
+    tox
+  })
   
   df3 <- eventReactive(input$inter_table_cell_clicked, {
     info = input$inter_table_cell_clicked
     # do nothing if not clicked yet, or the clicked cell is not in the 2nd column
     if (is.null(info$value) || info$col != 1) return()
-    v1 = input[["inter_table_cell_clicked"]]$value
+    v1 <- gsub("<.*?>", "", input[["inter_table_cell_clicked"]]$value) # remove the button html symbols around the Description
     GO_click = inter_go() %>% dplyr::filter(Description %in% v1)
     geneName = unlist(stringr::str_split(GO_click$geneID, pattern = "/"))
-    tox = ifelse(input$tox3 == "Cyclopamine", "CYCLO", ifelse(input$tox3 == "Methoxyacetic acid", "MAA", ifelse(input$tox3 == "Ogremorphin", "OGM", ifelse(input$tox3 == "Triademenol", "MENOL", ifelse(input$tox3 == "Cyclophosphamide", "CPA", ifelse(input$tox3 =="Methotrexate", "MTX", ifelse(input$tox3 == "Valproic acid", "VPA", ifelse(input$tox3 == "5-Flurouracil", "5FU", ifelse(input$tox3 == "Hydrogen Peroxide", "H2O2", "")))))))))
-    df1 = mir_targets() %>% dplyr::select(ID, Target) %>% dplyr::distinct() %>% dplyr::filter(Target %in% geneName)
+    tox = tox()
+    df1 = combo() %>% dplyr::select(ID, Gene) %>% dplyr::distinct() %>% dplyr::filter(Gene %in% geneName)
     count_mir = as.data.frame(counts) %>% dplyr::mutate(Geneid = tolower(Geneid)) %>% dplyr::filter(Geneid %in% df1$ID) %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% dplyr::select(Geneid, starts_with(tox)) 
     count_mrna = as.data.frame(counts_rna) %>% dplyr::select(starts_with(tox)) %>% tibble::rownames_to_column(var="gene") %>% filter(gene %in% geneName)
-    df2 = df1 %>% left_join(count_mir, by = c("ID" = "Geneid")) %>% left_join(count_mrna, by = c("Target"="gene"))
-    df3 = dplyr::mutate_if(df2, is.numeric, log2) # convert df2 to log2 scale
+    df2 = df1 %>% left_join(count_mir, by = c("ID" = "Geneid")) %>% left_join(count_mrna, by = c("Gene"="gene"))
+    df3 = dplyr::mutate_if(df2, is.numeric, ~ .x + 1) # add 1 to counts so that any with zero counts will not output infinity when taking the log.
+    df3 = dplyr::mutate_if(df3, is.numeric, log2) # convert df2 to log2 scale
     
     corr <- list()
     pvalue <- list()
     
     for (i in seq_len(nrow(df3))){
-      mirna <- as.numeric(df3[i, 3:5])
-      mrna <- as.numeric(df3[i,6:8])
+      mirna <- as.numeric(df3[i, 3:(length(tox)*3+2)])
+      mrna <- as.numeric(df3[i, (length(tox)*3+3):ncol(df3)])
       tmp <- stats::cor(mrna, mirna, method = "pearson")
       corr[[i]] <- tmp
       pval = stats::cor.test(mrna, mirna, method = "pearson")
       pvalue[[i]] <- pval$p.value
     }
     corr2 = unlist(corr, use.names = F)
-    df3$corr = corr2
+    df3$correlation = corr2
     pvalue = unlist(pvalue, use.names = F)
     df3$p_value = pvalue
     df3
   })
-  
+
   output$corr_table <- renderDT({
-    sketch = htmltools::withTags(table(
-      class = 'display',
-      thead(
-        tr(
-          th(rowspan = 2, 'microRNA'),
-          th(rowspan = 2, 'mRNA'),
-          th(colspan = 3, 'MicroRNA Counts'),
-          th(colspan = 3, 'mRNA Counts')
-        ),
-        tr(
-          lapply(names(df3())[-c(1,2)], th)
-        )
-      )
-    ))
-    df3() %>% 
-      DT::datatable(container = sketch, extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list( "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
+    validate(need(!is.null(input[["inter_table_cell_clicked"]]$value), message = "Click on the description in above table to generate correlations between microRNA and genes in the GO."))
+    df3 = df3()
+    tox = tox()
+    original_cols <- colnames(df3)
+    mir_name <- paste0(original_cols[3:(length(tox)*3+2)], "_miR")
+    mrna_name <- paste0(original_cols[(length(tox)*3+3):(ncol(df3)-2)], "_mRNA")
+    colnames(df3) <- c("microRNA", "mRNA", mir_name,  mrna_name, "correlation", "p_value")
+    df3 %>% 
+      DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
     })
   
   plot_df <- eventReactive(input$corr_table_rows_selected, {
+    tox = length(tox())
     info = input$corr_table_rows_selected
     # do nothing if not clicked yet, or the clicked cell is not in the 2nd column
     if (is.null(info)) return()
     df4 = df3()[info,]
-    selected = data.frame(microRNA = unlist(df4[,3:5], use.names = F), Genes = unlist(df4[,6:8]))
+    selected = data.frame(microRNA = unlist(df4[,3:(tox*3+2)], use.names = F), Genes = unlist(df4[, (tox*3+3):(ncol(df4)-2)]))
     
     ggscatter(selected, x = "microRNA", y = "Genes", 
               add = "reg.line", conf.int = TRUE, 
@@ -1722,6 +1745,7 @@ server <- function(input, output, session) {
   })
   
   output$corr_plot <- renderPlot({
+    validate(need(!is.null(input$corr_table_rows_selected), message = "Click on the row in the correlation table you want to plot."))
     plot_df()
   })
   
