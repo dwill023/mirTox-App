@@ -1593,7 +1593,6 @@ server <- function(input, output, session) {
     data_list = split(df3, f=df3$Toxicant)
     data_list = lapply(data_list, dplyr::select, Gene)
     data = lapply(data_list, unlist, use.names= FALSE)
-    
     color_g = list("Cyclopamine" = '#65A479',
                    "Methoxyacetic acid" = '#65A479',
                    "Ogremorphin" = '#65A479',
@@ -1603,7 +1602,7 @@ server <- function(input, output, session) {
                    "Valproic acid" = '#5D8CA8',
                    "5-Flurouracil" = '#D3BA68',
                    "Hydrogen Peroxide" = '#D5695D')
-    upsetjs() %>% fromList(data, colors = color_g) %>% generateDistinctIntersections(limit = 60) %>% chartLabels(title = stringi::stri_wrap(glue::glue_collapse(names(data), sep = ", ", last = " & "), width = 30), description = paste0(input$mir_reg, " microRNAs whose targets overlap ", input$rna_reg, " mRNAs.")) %>% 
+    upsetjs() %>% fromList(data, colors = color_g) %>% generateDistinctIntersections(limit = 60) %>% chartLabels(title = glue::glue_collapse(names(data), sep = ", ", last = " & "), description = paste0(input$mir_reg, " microRNAs whose targets overlap ", input$rna_reg, " mRNAs.")) %>% 
       chartLayout(set.label.alignment = "left")  %>% interactiveChart()
   })
   
