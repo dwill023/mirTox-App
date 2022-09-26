@@ -495,20 +495,32 @@ body <- bs4DashBody(
                                        column(3, span(textOutput("venn_clicked"), style ="color:black"))),
                                      fluidRow(column(6, span(textOutput("venn_clickedElements"), style ="color:black"))))),
                           column(6,
-                                 box("vennT", title = "Venn Intersection Table", width = NULL, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
+                                 box("vennT", title = "Intersection Table", width = NULL, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
                                      DT::dataTableOutput("venn_table") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
                  fluidRow(column(12,
                                  box("go_inter", title = "GO of Intersecting genes", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
-                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Click on a GO description in the table to generate correlations between the microRNA and the mRNA. This correlation table is shown below", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "GO is generated from the genes selected in the overlap in the upset plot, shown in the intersection table.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                      fluidRow(column(5,
-                                                     radioGroupButtons("ont2", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease", "GO:BP", "WikiPathways"), status = "warning", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
+                                                     radioGroupButtons("ont2", HTML('<h6 style="color:black;">Choice of Ontology Database</h6>'), choices = c("KEGG", "REACTOME", "Disease", "GO:BP", "WikiPathways"), status = "warning", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
                                               column(2,
                                                      actionBttn("go10", "Get Table", style = "jelly", color="danger"))),
                                      DT::dataTableOutput("inter_table") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
                  fluidRow(column(12,
-                                 box("corrT_box", title = "Correlation Table", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
-                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Click on a row in the table to generate a correlation plot between the mRNA and microRNA. Plot is shown below.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
-                                     DT::dataTableOutput("corr_table") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
+                                 box(title = "Correlation Table", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "gray",
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Choose to generate miR-mRNA correlations from the GO table above or by entering mRNAs manually from the intersection table.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
+                                     fluidRow(column(4,
+                                                     prettyRadioButtons(inputId = "corr_choice", label = "Choose Correlation Input", choices = c("From GO Table", "Custom"), icon = icon("check"), bigger = TRUE, status = "warning", inline = TRUE, animation = "jelly"))),
+                                     shinyjs::hidden(div(id = "go_input",
+                                                         fluidRow(column(4,
+                                                                         pickerInput("chose_ont", label = "Choose Ontology", choices= "", multiple = F, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
+                                                                  column(2,
+                                                                         actionBttn("go11", "Get Table", style = "jelly", color="danger"))))),
+                                     shinyjs::hidden(div(id = "man_input",
+                                                         fluidRow(column(4,
+                                                                         textAreaInput("gene_input", "Paste Genes Below", placeholder = "ACTB TNF", cols=17, rows = 4, resize = "both")),
+                                                                  column(2,
+                                                                         actionBttn("go12", "Get Table", style = "jelly", color="danger"))))),
+                                     DT::dataTableOutput("corr_table") %>% withSpinner(type =6 , size=1)))),
                  fluidRow(column(12,
                                  box("cor_box", title = "Correlation Plot", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
                                      plotOutput("corr_plot", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
@@ -1030,7 +1042,7 @@ server <- function(input, output, session) {
   output$downgo <- downloadHandler(
     filename = function(){ paste0("GO_dotplot", ".png")},
     content = function(file) {
-    ggplot2::ggsave(file, plot = go_plot(), width = 8, height = 11, units = "in", device = "png")
+    ggplot2::ggsave(file, plot = go_plot(), width = 11, height = 11, units = "in", device = "png")
     }
   )
   
@@ -1405,7 +1417,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$resetAll2, {
-    reset("go_box")
+    reset("go_box_g")
     hide(selector = "#tabbox5 li a[data-value=tab3g]")
     hide(selector = "#tabbox5 li a[data-value=tab4g]")
   })
@@ -1672,11 +1684,17 @@ server <- function(input, output, session) {
   })
   
   output$inter_table <- renderDataTable({
-    inter_go() %>% dplyr::mutate(Description = paste0("<button class='table_btn' title='Click to get correlations below.'>", Description, "</button>"))
+    inter_go()
   }, extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
                                                                                                                                                     buttons = c("csv", "excel", "pdf"),
                                                                                                                                                     text = "Download")),
                                                                                             pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+  # use the ontologies generated above as choices in cor_table
+  observe({
+    df = inter_go()$Description
+    updatePickerInput(session, "chose_ont", choices = unique(df))
+  })
+  
   # isolate the abbreviated name of tox treatments when the upset plot is clicked on
   tox <- reactive({
     combo = combo() %>% dplyr::filter(Gene %in% as.character(input$venn_click$elems)) %>% dplyr::select(Toxicant) %>% dplyr::distinct()
@@ -1684,14 +1702,16 @@ server <- function(input, output, session) {
     tox
   })
   
-  df3 <- eventReactive(input$inter_table_cell_clicked, {
-    info = input$inter_table_cell_clicked
-    # do nothing if not clicked yet, or the clicked cell is not in the 2nd column
-    if (is.null(info$value) || info$col != 1) return()
-    v1 <- gsub("<.*?>", "", input[["inter_table_cell_clicked"]]$value) # remove the button html symbols around the Description
-    GO_click = inter_go() %>% dplyr::filter(Description %in% v1)
-    geneName = unlist(stringr::str_split(GO_click$geneID, pattern = "/"))
+  observe({
+    toggle(id = "go_input", condition = {input$corr_choice %in% "From GO Table"})
+    toggle(id = "man_input", condition = {input$corr_choice %in% "Custom"})
+  })
+  
+  # corr dataframe for ontology choice
+  df3 <- eventReactive(input$go11, {
     tox = tox()
+    GO_click = inter_go() %>% dplyr::filter(Description %in% input$chose_ont)
+    geneName = unlist(stringr::str_split(GO_click$geneID, pattern = "/"))
     df1 = combo() %>% dplyr::select(ID, Gene) %>% dplyr::distinct() %>% dplyr::filter(Gene %in% geneName)
     count_mir = as.data.frame(counts) %>% dplyr::mutate(Geneid = tolower(Geneid)) %>% dplyr::filter(Geneid %in% df1$ID) %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% dplyr::select(Geneid, starts_with(tox)) 
     count_mrna = as.data.frame(counts_rna) %>% dplyr::select(starts_with(tox)) %>% tibble::rownames_to_column(var="gene") %>% filter(gene %in% geneName)
@@ -1716,16 +1736,47 @@ server <- function(input, output, session) {
     df3$p_value = pvalue
     df3
   })
+  
+  df4 <- eventReactive(input$go12, {
+    tox = tox()
+    geneName = scan(text = input$gene_input, what = "")
+    df1 = combo() %>% dplyr::select(ID, Gene) %>% dplyr::distinct() %>% dplyr::filter(Gene %in% geneName)
+    count_mir = as.data.frame(counts) %>% dplyr::mutate(Geneid = tolower(Geneid)) %>% dplyr::filter(Geneid %in% df1$ID) %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% dplyr::select(Geneid, starts_with(tox)) 
+    count_mrna = as.data.frame(counts_rna) %>% dplyr::select(starts_with(tox)) %>% tibble::rownames_to_column(var="gene") %>% filter(gene %in% geneName)
+    df2 = df1 %>% left_join(count_mir, by = c("ID" = "Geneid")) %>% left_join(count_mrna, by = c("Gene"="gene"))
+    df4 = dplyr::mutate_if(df2, is.numeric, ~ .x + 1) # add 1 to counts so that any with zero counts will not output infinity when taking the log.
+    df4 = dplyr::mutate_if(df4, is.numeric, log2) # convert df2 to log2 scale
+    
+    corr <- list()
+    pvalue <- list()
+    
+    for (i in seq_len(nrow(df4))){
+      mirna <- as.numeric(df4[i, 3:(length(tox)*3+2)])
+      mrna <- as.numeric(df4[i, (length(tox)*3+3):ncol(df4)])
+      tmp <- stats::cor(mrna, mirna, method = "pearson")
+      corr[[i]] <- tmp
+      pval = stats::cor.test(mrna, mirna, method = "pearson")
+      pvalue[[i]] <- pval$p.value
+    }
+    corr2 = unlist(corr, use.names = F)
+    df4$correlation = corr2
+    pvalue = unlist(pvalue, use.names = F)
+    df4$p_value = pvalue
+    df4
+  })
 
   output$corr_table <- renderDT({
-    validate(need(!is.null(input[["inter_table_cell_clicked"]]$value), message = "Click on the description in above table to generate correlations between microRNA and genes in the GO."))
-    df3 = df3()
+    if (input$corr_choice %in% "From GO Table"){
+      data = df3()
+    } else{
+      data = df4()
+    }
     tox = tox()
-    original_cols <- colnames(df3)
+    original_cols <- colnames(data)
     mir_name <- paste0(original_cols[3:(length(tox)*3+2)], "_miR")
-    mrna_name <- paste0(original_cols[(length(tox)*3+3):(ncol(df3)-2)], "_mRNA")
-    colnames(df3) <- c("microRNA", "mRNA", mir_name,  mrna_name, "correlation", "p_value")
-    df3 %>% 
+    mrna_name <- paste0(original_cols[(length(tox)*3+3):(ncol(data)-2)], "_mRNA")
+    colnames(data) <- c("microRNA", "mRNA", mir_name,  mrna_name, "correlation", "p_value")
+    data %>% 
       DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
     })
   
@@ -1733,8 +1784,14 @@ server <- function(input, output, session) {
     tox = length(tox())
     info = input$corr_table_rows_selected
     # do nothing if not clicked yet, or the clicked cell is not in the 2nd column
-    if (is.null(info)) return()
-    df4 = df3()[info,]
+    if (is.null(info)){ 
+      return()
+    }
+    else if(input$corr_choice %in% "From GO Table"){
+      df4 = df3()[info,]
+    } else {
+      df4 = df4()[info,]
+    }
     selected = data.frame(microRNA = unlist(df4[,3:(tox*3+2)], use.names = F), Genes = unlist(df4[, (tox*3+3):(ncol(df4)-2)]))
     
     ggscatter(selected, x = "microRNA", y = "Genes", 
