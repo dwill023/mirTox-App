@@ -12,10 +12,6 @@ library(DT)
 library(dplyr)
 library(ggplot2)
 library(htmlwidgets)
-#library(corrplot)
-#library(visNetwork)
-#library(gridExtra)
-#library(EnvStats)
 library(paletteer)
 library(plotly)
 library(EnhancedVolcano)
@@ -1061,7 +1057,8 @@ server <- function(input, output, session) {
       coord_flip() +
       labs(title = paste0(ifelse(input$go_choice %in% "Toxicant", input$tox2, input$go_choice), " ", ifelse(input$go_choice %in% "Toxicant", input$reg2, "of"), " microRNAs in ", input$ont, " ontologies"),
            x= NULL, y = expression("-Log"[10]*"(adjusted p-value)"), fill = expression("-Log"[10]*"(p.adjust)")) +
-      ds4psy::theme_ds4psy(col_title = "#37474f" , col_brdrs = "#37474f")
+      ds4psy::theme_ds4psy(col_title = "#37474f" , col_brdrs = "#37474f") +
+      theme(axis.text.y = element_text(size = 18))
     p
   })
   
@@ -1538,7 +1535,8 @@ server <- function(input, output, session) {
       coord_flip() +
       labs(title = paste0(ifelse(input$in_choice %in% "Toxicant", input$tox4_g, input$in_choice), " ", ifelse(input$in_choice %in% "Toxicant", input$gene_reg, "of"), " mRNAs in ", input$ont_choice, " ontologies"),
            x= NULL, y = expression("-Log"[10]*"(adjusted p-value)"), fill = expression("-Log"[10]*"(p.adjust)")) +
-      ds4psy::theme_ds4psy(col_title = "#37474f" , col_brdrs = "#37474f")
+      ds4psy::theme_ds4psy(col_title = "#37474f" , col_brdrs = "#37474f") +
+      theme(axis.text.y = element_text(size = 18))
     p
   })
   
@@ -1792,12 +1790,27 @@ server <- function(input, output, session) {
     } else {
       df4 = df4()[info,]
     }
-    selected = data.frame(microRNA = unlist(df4[,3:(tox*3+2)], use.names = F), Genes = unlist(df4[, (tox*3+3):(ncol(df4)-2)]))
+    selected = data.frame(microRNA = unlist(df4[,3:(tox*3+2)], use.names = F), Genes = unlist(df4[, (tox*3+3):(ncol(df4)-2)])) %>% tibble::rownames_to_column(var = "sample")
+    selected = selected %>%
+      mutate(tox = dplyr::case_when(
+        grepl("^CYCLO", selected$sample) ~ "Cyclopamine",
+        grepl("^MAA", selected$sample) ~ "Methoxyacetic acid",
+        grepl("^OGM", selected$sample) ~ "Ogremorphin",
+        grepl("^MENOL", selected$sample) ~ "Triademenol",
+        grepl("^CPA", selected$sample) ~ "Cyclophosphamide",
+        grepl("^MTX", selected$sample) ~ "Methotrexate",
+        grepl("^VPA", selected$sample) ~ "Valproic acid",
+        grepl("^5FU", selected$sample) ~ "5-Flurouracil",
+        grepl("^H2O2", selected$sample) ~ "Hydrogen Peroxide"
+      ))
     
-    ggscatter(selected, x = "microRNA", y = "Genes", 
-              add = "reg.line", conf.int = TRUE, 
-              cor.coef = TRUE, cor.method = "pearson",
-              xlab = paste0(df4[1,1], " Normalized Count"), ylab =  paste0(df4[1,2], " Normalized Count"))
+    ggplot(selected, aes(x=microRNA, y=Genes)) +
+      geom_point(aes(color = tox), size = 2) +
+      geom_smooth(method="lm") +
+      stat_cor(method = "pearson", cor.coef.name = "R", output.type = "text") +
+      scale_color_manual(values = c("#F07F09FF","#9F2936FF", "#1B587CFF","#4E8542FF", "#604878FF", "#C19859FF","#FFAE34FF", "#EF6F6AFF", "#767676FF"))+
+      theme(legend.position="bottom", legend.box = "horizontal") +
+      labs(x= paste0(df4[1,1], " Normalized Count"), y= paste0(df4[1,2], " Normalized Count"), color = "Toxicant")
   })
   
   output$corr_plot <- renderPlot({
