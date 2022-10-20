@@ -275,9 +275,9 @@ body <- bs4DashBody(
                                                                           fluidRow(column(4,
                                                                                           textAreaInput("mir_list", "Input custom microRNAs", placeholder = "hsa-miR-21-5p", cols=17, rows = 4, resize = "both"))))),
                                                       fluidRow(column(3,
-                                                                      actionBttn("go5", "Get Table", style = "jelly", color="danger")),
+                                                                      actionBttn("go5", "Get Table", style = "jelly", color="danger", icon = icon("circle-play"))),
                                                                column(3,
-                                                                      actionButton("resetAll", "Reset all", status = "warning"))),
+                                                                      actionButton("resetAll", "Reset all", status = "warning", icon = icon("refresh", lib = "glyphicon")))),
                                                       br(),
                                                       shinycustomloader::withLoader(DT::DTOutput("targetstable",  height = "500px"), type = 'image', loader = 'coffee_loading.gif')),
                                              tabPanel(HTML('<h6 style="color:black;">Ontology</h6>'), value = "tab2",
@@ -291,14 +291,14 @@ body <- bs4DashBody(
                                                       fluidRow(column(5,
                                                                       pickerInput("ont_pick", label = "Choose Ontology", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
                                                                column(3,
-                                                                      actionBttn("go7", "Plot", style = "jelly", color="danger"))),
+                                                                      actionBttn("go7", "Plot", style = "jelly", color="danger", icon = icon("chart-gantt")))),
                                                       plotOutput("ont_plot", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
                                                       downloadButton("downgo", "Download Plot", icon=icon("download", lib = "font-awesome"))),
                                              tabPanel(HTML('<h6 style="color:black;">Bar Plot</h6>'), value = "tab4",
                                                       fluidRow(column(5,
                                                                       pickerInput("ont_pick2", label = "Choose Ontology", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
                                                                column(3,
-                                                                      actionBttn("go8", "Plot", style = "jelly", color="danger"))),
+                                                                      actionBttn("go8", "Plot", style = "jelly", color="danger", icon=icon("square-poll-horizontal")))),
                                                       plotOutput("ont_barplot", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
                                                       downloadButton("downgo2", "Download Plot", icon=icon("download", lib = "font-awesome")))
                                       ))# div go_box
@@ -439,23 +439,23 @@ body <- bs4DashBody(
                                                          fluidRow(column(5,
                                                                          radioGroupButtons("ont_choice", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease", "GO:Biological Process", "WikiPathways"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
                                                                   column(3,
-                                                                         actionBttn("get_go", "Get Table", style = "jelly", color="danger")),
+                                                                         actionBttn("get_go", "Get Table", style = "jelly", color="danger", icon = icon("circle-play"))),
                                                                   column(3,
-                                                                         actionButton("resetAll2", "Reset all", status = "warning"))),
+                                                                         actionButton("resetAll2", "Reset all", status = "warning", icon = icon("refresh", lib = "glyphicon")))),
                                                          br(),
                                                          shinycustomloader::withLoader(DT::DTOutput("geneGOtable",  height = "500px"), type = 'image', loader = 'coffee_loading.gif')),
                                                 tabPanel(HTML('<h6 style="color:black;">Dot Plot</h6>'), value = "tab3g",
                                                          fluidRow(column(5,
                                                                          pickerInput("ont_pickg", label = "Choose Ontology", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
                                                                   column(3,
-                                                                         actionBttn("get_dot", "Plot", style = "jelly", color="danger"))),
+                                                                         actionBttn("get_dot", "Plot", style = "jelly", color="danger", icon=icon("chart-gantt")))),
                                                          plotOutput("ont_plot_gene", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
                                                          downloadButton("downgo_g", "Download Plot", icon=icon("download", lib = "font-awesome"))),
                                                 tabPanel(HTML('<h6 style="color:black;">Bar Plot</h6>'), value = "tab4g",
                                                          fluidRow(column(5,
                                                                          pickerInput("ont_pick2g", label = "Choose Ontology", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
                                                                   column(3,
-                                                                         actionBttn("get_bar", "Plot", style = "jelly", color="danger"))),
+                                                                         actionBttn("get_bar", "Plot", style = "jelly", color="danger", icon=icon("square-poll-horizontal")))),
                                                          plotOutput("ont_barplot_gene", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
                                                          downloadButton("downgo2_g", "Download Plot", icon=icon("download", lib = "font-awesome")))
                                          ))# div go_box_g
@@ -471,7 +471,7 @@ body <- bs4DashBody(
                    The interseting genes are analyzed within the selected gene ontology. The ontology of interest can be chosen to obtain the specific gene set that is matched 
                    back with the microRNA target. A Pearson correlation is calculated using the log2 normalized counts for the replicate samples between the microRNA and its target within the RNA-seq. "),
                  fluidRow(column(3,
-                                 pickerInput("tox3", label = "Choice of toxicant", choices = names(DEG), multiple = T, options = list(style = "btn-light", `live-search` = TRUE)))),
+                                 pickerInput("tox3", label = "Choice of toxicant", choices = names(DEG), multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE)))),
                  fluidRow(column(3,
                                  sliderTextInput("FC_4", "Log2Fold-Change (absolute value)", choices = seq(from= 0, to= 4, by=0.5), grid = TRUE, selected = 1)),
                           column(3,
@@ -481,7 +481,7 @@ body <- bs4DashBody(
                           column(4,
                                  prettyRadioButtons(inputId = "rna_reg", label = "mRNA regulation", choices = c("Up-regulated", "Down-regulated"), icon = icon("check"), bigger = TRUE, status = "warning", inline = TRUE, animation = "jelly")),
                           column(3,
-                                 actionBttn("go9", "Get Overlap", style = "jelly", color="danger"))),
+                                 actionBttn("go9", "Get Overlap", style = "jelly", color="danger", icon = icon("angles-down")))),
                  fluidRow(column(6,
                                  box("venn", title = "Overlapping MicroRNA targets & mRNAs", width = NULL, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
                                      label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Click the intersection to view the genes. The intersection is also displayed in the adjacent box.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
@@ -884,7 +884,7 @@ server <- function(input, output, session) {
   )
   
   ##### GO #######
-  
+
   # hide the other two tabs that depend on values generated in the first tab
   observe({
     hide(selector = "#tabbox3 li a[data-value=tab2]")
@@ -899,10 +899,17 @@ server <- function(input, output, session) {
   
   observeEvent(input$resetAll, {
     reset("go_box")
+    reset("go5")
+    updateSliderTextInput(session, "FC_3", selected = 1)
+    updateRadioGroupButtons(session, "reg2", selected = "Up-regulated")
+    updateRadioGroupButtons(session, "ont", selected = "KEGG")
+    updatePickerInput(session, "ont_pick", choices = "")
+    updatePickerInput(session, "ont_pick2", choices = "")
     hide(selector = "#tabbox3 li a[data-value=tab2]")
     hide(selector = "#tabbox3 li a[data-value=tab3]")
     hide(selector = "#tabbox3 li a[data-value=tab4]")
   })
+  
   
   mirs_choice <- reactive({
     if(input$go_choice %in% "Toxicant"){
@@ -950,19 +957,23 @@ server <- function(input, output, session) {
     res
   })
   
-  output$targetstable <- renderDT({
-    mirnet_targets() %>% 
-      dplyr::mutate(TargetID = paste0("<a href='","https://www.ncbi.nlm.nih.gov/gene/", TargetID, "' target='_blank'>", TargetID, "</a>")) %>%
-      dplyr::rename("microRNA" = "ID", "PMID" = "Literature", "Entrez Gene ID" = "TargetID") %>%
-      datatable(rownames=F, filter="top", escape = F, extensions =c("Buttons"), options = list(dom = 'lBrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")),
-                                                                                               pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+  observe({
+    input$go5
+    output$targetstable <- renderDT({
+      mirnet_targets() %>% 
+        dplyr::mutate(TargetID = paste0("<a href='","https://www.ncbi.nlm.nih.gov/gene/", TargetID, "' target='_blank'>", TargetID, "</a>")) %>%
+        dplyr::rename("microRNA" = "ID", "PMID" = "Literature", "Entrez Gene ID" = "TargetID") %>%
+        datatable(rownames=F, filter="top", escape = F, extensions =c("Buttons"), options = list(dom = 'lBrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")),
+                                                                                                 pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+    })
   })
+  
   
   # once the get table button on the first tab is clicked, reveal the other three tabs.
   observeEvent(input$go5, {
-    shinyjs::toggle(selector = "#tabbox3 li a[data-value=tab2]")
-    shinyjs::toggle(selector = "#tabbox3 li a[data-value=tab3]")
-    shinyjs::toggle(selector = "#tabbox3 li a[data-value=tab4]")
+    shinyjs::show(selector = "#tabbox3 li a[data-value=tab2]")
+    shinyjs::show(selector = "#tabbox3 li a[data-value=tab3]")
+    shinyjs::show(selector = "#tabbox3 li a[data-value=tab4]")
   })
   
   
@@ -1004,16 +1015,22 @@ server <- function(input, output, session) {
     res <- res %>% dplyr::filter(p.adjust < 0.05) %>% dplyr::select(ID, Description, GeneRatio, pvalue, p.adjust, geneID, Count) %>% dplyr::mutate(GeneRatio = DOSE::parse_ratio(GeneRatio))
   })
   
-  output$GOtable <- renderDT({
-    datatable(go_table(), extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, options = list(scrollX = TRUE, "dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
-                                                                                                                                                                         buttons = c("csv", "excel", "pdf"),
-                                                                                                                                                                         text = "Download")),
-                                                                                                                 pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
-    
+  observe({
+    input$go6
+    output$GOtable <- renderDT({
+      datatable(go_table(), extensions =c("Buttons"), rownames = FALSE, filter = "top", escape = F, options = list(scrollX = TRUE, "dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
+                                                                                                                                                                                           buttons = c("csv", "excel", "pdf"),
+                                                                                                                                                                                           text = "Download")),
+                                                                                                                   pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+      
+    })
   })
+  
+
   
   # use the ontologies generated above as choices to plot
   observe({
+    input$go6
     df = go_table()$Description
     updatePickerInput(session, "ont_pick", choices = unique(df))
   })
@@ -1026,13 +1043,18 @@ server <- function(input, output, session) {
       scale_size(range = c(2,10)) +
       theme_bw() +
       xlab("GeneRatio") + ylab(NULL) +
-      ggtitle(paste0(ifelse(input$go_choice %in% "Toxicant", input$tox2, input$go_choice), " ", ifelse(input$go_choice %in% "Toxicant", input$reg2, "of"), " microRNAs in ", input$ont, " ontologies"))
+      ggtitle(paste0(ifelse(input$go_choice %in% "Toxicant", input$tox2, input$go_choice), " ", ifelse(input$go_choice %in% "Toxicant", input$reg2, "of"), " microRNAs in ", input$ont, " ontologies")) +
+      theme(axis.text.y = element_text(size = 18))
     p
   })
   
-  output$ont_plot <- renderPlot({
-    go_plot()
+  observe({
+    input$go7
+    output$ont_plot <- renderPlot({
+      go_plot()
+    })
   })
+  
   
   #download handler to generate plotdownload
   output$downgo <- downloadHandler(
@@ -1044,6 +1066,7 @@ server <- function(input, output, session) {
   
   # use the ontologies generated as choices to plot
   observe({
+    input$go6
     df = go_table()$Description
     updatePickerInput(session, "ont_pick2", choices = unique(df))
   })
@@ -1062,9 +1085,13 @@ server <- function(input, output, session) {
     p
   })
   
-  output$ont_barplot <- renderPlot({
-    go_plotbar()
+  observe({
+    input$go8
+    output$ont_barplot <- renderPlot({
+      go_plotbar()
+    })
   })
+
   
   #download handler to generate plotdownload
   output$downgo2 <- downloadHandler(
@@ -1073,6 +1100,15 @@ server <- function(input, output, session) {
       ggplot2::ggsave(file, plot = go_plotbar(), width = 14, height = 11, units = "in", device = "png", bg = "white")
     }
   )
+  
+  # upon pressing reset button clear out plots and ontology choices
+  observe({
+    input$resetAll
+    output$targetstable <- renderDT({NULL})
+    output$GOtable <- renderDT({NULL})
+    output$ont_plot <- renderPlot({NULL})
+    output$ont_barplot <- renderPlot({NULL})
+  })
   
   #### mRNA TAB #######
   
@@ -1415,6 +1451,9 @@ server <- function(input, output, session) {
   
   observeEvent(input$resetAll2, {
     reset("go_box_g")
+    updateSliderTextInput(session, "FC_gene3", selected = 1)
+    updateRadioGroupButtons(session, "gene_reg", selected = "Up-regulated")
+    updateRadioGroupButtons(session, "ont_choice", selected = "KEGG")
     hide(selector = "#tabbox5 li a[data-value=tab3g]")
     hide(selector = "#tabbox5 li a[data-value=tab4g]")
   })
@@ -1438,8 +1477,8 @@ server <- function(input, output, session) {
   
   # once the get table button on the first tab is clicked, reveal the other three tabs.
   observeEvent(input$get_go, {
-    shinyjs::toggle(selector = "#tabbox5 li a[data-value=tab3g]")
-    shinyjs::toggle(selector = "#tabbox5 li a[data-value=tab4g]")
+    shinyjs::show(selector = "#tabbox5 li a[data-value=tab3g]")
+    shinyjs::show(selector = "#tabbox5 li a[data-value=tab4g]")
   })
   
   
@@ -1482,13 +1521,17 @@ server <- function(input, output, session) {
     res <- res %>% dplyr::filter(p.adjust < 0.05) %>% dplyr::select(ID, Description, GeneRatio, pvalue, p.adjust, geneID, Count) %>% dplyr::mutate(GeneRatio = DOSE::parse_ratio(GeneRatio))
   })
   
-  output$geneGOtable <- renderDT({
-    datatable(go_table_g(), extensions =c("Buttons", 'Responsive'), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
-                                                                                                                                                                                       buttons = c("csv", "excel", "pdf"),
-                                                                                                                                                                                       text = "Download")),
-                                                                                                                               pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
-    
+  observe({
+    input$get_go
+    output$geneGOtable <- renderDT({
+      datatable(go_table_g(), extensions =c("Buttons", 'Responsive'), rownames = FALSE, filter = "top", escape = F, options = list("dom" = 'T<"clear">lBrtip', buttons = list('copy', list(extend = "collection",
+                                                                                                                                                                                           buttons = c("csv", "excel", "pdf"),
+                                                                                                                                                                                           text = "Download")),
+                                                                                                                                   pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
+      
+    })
   })
+
   
   # use the ontologies generated above as choices to plot
   observe({
@@ -1508,9 +1551,13 @@ server <- function(input, output, session) {
     p
   })
   
-  output$ont_plot_gene <- renderPlot({
-    go_plotg()
+  observe({
+    input$get_dot
+    output$ont_plot_gene <- renderPlot({
+      go_plotg()
+    })
   })
+
   
   #download handler to generate plotdownload
   output$downgo_g <- downloadHandler(
@@ -1540,9 +1587,13 @@ server <- function(input, output, session) {
     p
   })
   
-  output$ont_barplot_gene <- renderPlot({
-    go_plotbar_g()
+  observe({
+    input$get_bar
+    output$ont_barplot_gene <- renderPlot({
+      go_plotbar_g()
+    })
   })
+  
   
   #download handler to generate plotdownload
   output$downgo2_g <- downloadHandler(
@@ -1551,6 +1602,14 @@ server <- function(input, output, session) {
       ggplot2::ggsave(file, plot = go_plotbar_g(), width = 14, height = 11, units = "in", device = "png", bg = "white")
     }
   )
+  
+  # upon pressing reset button clear out plots and ontology choices
+  observe({
+    input$resetAll2
+    output$geneGOtable <- renderDT({NULL})
+    output$ont_plot_gene <- renderPlot({NULL})
+    output$ont_barplot_gene <- renderPlot({NULL})
+  })
   
   
   #### Correlation TAB #######
