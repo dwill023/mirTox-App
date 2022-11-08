@@ -136,7 +136,8 @@ body <- bs4DashBody(
                  p("Human embryonic stem cells (hESCs - H9) are induced to osteogenic differentiation and simultaneously treated with the toxicants in the below table, known to inhibit neural crest differentiation leading to craniofacial defects or mesoderm differentiation (limb skeleton)."),
                  gt_output("toxtable") %>% withSpinner(type = 6, size=1),
                  br(),
-                 p("This app will visualize the analysis of both miRNA-sequencing and mRNA-sequencing individually to explore the differentially regulated miRNAs and genes in the treatments. Then both datasets are integrated to display any inverse correlation of miRNA to its known or predicted mRNA target. The mRNA hits can be used in pathway analysis to identify involvement in osteogenic differentiation."),
+                 p("RNA from the cells was extracted on day 7 of the osteogenic differentiation then microRNA purification and library preparation was performed. mRNA sequencing was also performed from the same RNA extracted samples."),
+                 p("This app will visualize the analysis of both miRNA-sequencing and mRNA-sequencing individually to explore the differentially regulated miRNAs and genes in the treatments. Then both datasets are integrated to display any inverse correlation of miRNA to its validated mRNA target (using miRTarBase v8.0, TarBase v8.0 and miRecords). The mRNA hits can be used in pathway analysis to identify involvement in osteogenic differentiation."),
                  h4("Samples"),
                  p("The principal component analysis (PCA) for each sequencing project is displayed below."),
                  fluidRow(column(6,
@@ -484,7 +485,7 @@ body <- bs4DashBody(
                                  actionBttn("go9", "Get Overlap", style = "jelly", color="danger", icon = icon("angles-down")))),
                  fluidRow(column(6,
                                  box("venn", title = "Overlapping MicroRNA targets & mRNAs", width = NULL, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
-                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Click the intersection to view the genes. The intersection is also displayed in the adjacent box.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Click the intersection to view the miRs. The intersection is also displayed in the adjacent box.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                      upsetjsOutput("venn", width = "100%", height = "600px") %>% withSpinner(type = 6, size=1, color = "#343a40"),
                                      fluidRow(
                                        column(2, "Intersections"),
@@ -492,20 +493,21 @@ body <- bs4DashBody(
                                      fluidRow(column(6, span(textOutput("venn_clickedElements"), style ="color:black"))))),
                           column(6,
                                  box("vennT", title = "Intersection Table", width = NULL, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Table displays the miRs in the clicked upset plot intersections with their target mRNAs that are expressed (RNA-seq) within the toxicant(s).", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                      DT::dataTableOutput("venn_table") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
                  fluidRow(column(12,
                                  box("go_inter", title = "GO of Intersecting genes", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
-                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "GO is generated from the genes selected in the overlap in the upset plot, shown in the intersection table.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "GO is generated from the mRNAs shown in the intersection table.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                      fluidRow(column(5,
                                                      radioGroupButtons("ont2", HTML('<h6 style="color:black;">Choice of Ontology Database</h6>'), choices = c("KEGG", "REACTOME", "Disease", "GO:BP", "WikiPathways"), status = "warning", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
                                               column(2,
                                                      actionBttn("go10", "Get Table", style = "jelly", color="danger"))),
-                                     DT::dataTableOutput("inter_table") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
+                                     shinycustomloader::withLoader(DT::dataTableOutput("inter_table"), type = 'image', loader = 'loading.gif')))),
                  fluidRow(column(12,
                                  box(title = "Correlation Table", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "gray",
-                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Choose to generate miR-mRNA correlations from the GO table above or by entering mRNAs manually from the intersection table.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Choose to generate miR-mRNA correlations from the GO table above or by selecting a choice of mRNAs listed from the intersection table.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                      fluidRow(column(4,
-                                                     prettyRadioButtons(inputId = "corr_choice", label = "Choose Correlation Input", choices = c("From GO Table", "Custom"), icon = icon("check"), bigger = TRUE, status = "warning", inline = TRUE, animation = "jelly"))),
+                                                     prettyRadioButtons(inputId = "corr_choice", label = "Choose Correlation Input", choices = c("From GO Table", "From Intersection Table"), icon = icon("check"), bigger = TRUE, status = "warning", inline = TRUE, animation = "jelly"))),
                                      shinyjs::hidden(div(id = "go_input",
                                                          fluidRow(column(4,
                                                                          pickerInput("chose_ont", label = "Choose Ontology", choices= "", multiple = F, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
@@ -513,12 +515,13 @@ body <- bs4DashBody(
                                                                          actionBttn("go11", "Get Table", style = "jelly", color="danger"))))),
                                      shinyjs::hidden(div(id = "man_input",
                                                          fluidRow(column(4,
-                                                                         textAreaInput("gene_input", "Paste Genes Below", placeholder = "ACTB TNF", cols=17, rows = 4, resize = "both")),
+                                                                         pickerInput("chose_mRNA", label = "Choose mRNAs", choices= "", multiple = T, options = list(style = "btn-light", `live-search` = TRUE, `actions-box` = TRUE))),
                                                                   column(2,
                                                                          actionBttn("go12", "Get Table", style = "jelly", color="danger"))))),
                                      DT::dataTableOutput("corr_table") %>% withSpinner(type =6 , size=1)))),
                  fluidRow(column(12,
                                  box("cor_box", title = "Correlation Plot", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
+                                     label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "To generate plot, select a row in the above correlation.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                      plotOutput("corr_plot", width = "80%", height = "800px") %>% withSpinner(type =6 , size=1),
                                      downloadButton("downcorr", "Download Plot", icon=icon("download", lib = "font-awesome")))))
                  
@@ -547,8 +550,8 @@ server <- function(input, output, session) {
   output$toxtable <- render_gt({
     tox_df = data.frame(Chemical = c("Cyclopamine", "Methoxyacetic acid", "Ogremorphin", "Triademenol", "Cyclophosphamide", "Methotrexate", "Valproic acid", "5-Flurouracil", "Hydrogen Peroxide"),
                         Abbreviation = c("CYCLO", "MAA", "OGM", "MENOL", "CPA", "MTX", "VPA", "5FU", "H2O2"),
-                        "micrograms per mL" = c(41.16, 9, 0.0309, 29.58, 10, 0.01, 10, 0.0025, NA), 
-                        "µM" = c(100, 100, 0.1, 100, 35.8, 0.022, 58.9, 0.0192, NA),
+                        "micrograms per mL" = c(41.16, 9, 0.0309, 29.58, 10, 0.01, 10, 0.0025, 0.017), 
+                        "µM" = c(100, 100, 0.1, 100, 35.8, 0.022, 58.9, 0.0192, 0.5),
                         check.names = F)
     tox_tbl = gt(tox_df, rowname_col = "Chemical") %>%
       tab_header(title = "Developmental Toxicants") %>%
@@ -1658,9 +1661,9 @@ server <- function(input, output, session) {
   })
   
   upset_combo <- eventReactive(input$go9,{
-    df3 = combo() %>% dplyr::select(Toxicant, Gene) %>% dplyr::distinct()
+    df3 = combo() %>% dplyr::select(Toxicant, ID) %>% dplyr::distinct()
     data_list = split(df3, f=df3$Toxicant)
-    data_list = lapply(data_list, dplyr::select, Gene)
+    data_list = lapply(data_list, dplyr::select, ID)
     data = lapply(data_list, unlist, use.names= FALSE)
     color_g = list("Cyclopamine" = '#65A479',
                    "Methoxyacetic acid" = '#65A479',
@@ -1687,17 +1690,27 @@ server <- function(input, output, session) {
     as.character(input$venn_click$elems)
   })
   
+  ovlap_df <- reactive({
+    combo_intersect = combo() %>% filter(ID %in% as.character(input$venn_click$elems))
+    combo_df = tidyr::pivot_wider(data = combo_intersect[,1:3], names_from = Toxicant, values_from = ID)
+    combo_df2 = combo_df %>% tidyr::drop_na() %>% tidyr::unnest(cols = everything())
+    combo_df3 = tidyr::pivot_longer(combo_df2, cols = !1, names_to = "Toxicant", values_to = "microRNA")
+    intersect_table = dplyr::left_join(combo_df3, mir_targets(), by=c("Gene" = "Target", "microRNA" = "ID", "Toxicant" = "Toxicant"))
+    intersect_table
+  })
+  
   output$venn_table <- renderDT({
     validate(need(!is.null(input$venn_click$elems), message = "Click on an intersection in the upset plot to view table."))
-    combo() %>% dplyr::filter(Gene %in% as.character(input$venn_click$elems)) %>%
+    
+    ovlap_df() %>% 
       dplyr::mutate(TargetID = paste0("<a href='","https://www.ncbi.nlm.nih.gov/gene/", TargetID, "' target='_blank'>", TargetID, "</a>")) %>%
-      dplyr::rename("microRNA" = "ID", "PMID" = "Literature", "mRNA" = "Gene", "Entrez Gene ID" = "TargetID", "miR Accession" = "Accession") %>%
+      dplyr::rename("PMID" = "Literature", "mRNA" = "Gene", "Entrez Gene ID" = "TargetID", "miR Accession" = "Accession") %>%
       dplyr::select(Toxicant, microRNA, "miR Accession", mRNA, "Entrez Gene ID", Experiment, PMID) %>%
       DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
   })
   
   inter_go <- eventReactive(input$go10, {
-    entrezid = combo() %>% filter(Gene %in% as.character(input$venn_click$elems)) %>% dplyr::select(TargetID) %>% dplyr::distinct()
+    entrezid = ovlap_df() %>% dplyr::select(TargetID) %>% dplyr::distinct()
     if (input$ont2 %in% "KEGG"){
       res <- enrichKEGG(gene         = entrezid$TargetID,
                         organism     = 'hsa',
@@ -1746,7 +1759,13 @@ server <- function(input, output, session) {
                                                                                                                                                     buttons = c("csv", "excel", "pdf"),
                                                                                                                                                     text = "Download")),
                                                                                             pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All"))))
-  # use the ontologies generated above as choices in cor_table
+  # pick mRNAs from intersection table 
+  observeEvent(input$venn_click$elems, {
+    df = unique(ovlap_df()$Gene)
+    updatePickerInput(session, "chose_mRNA", choices = df)
+  })
+  
+  # pick ontologies generated above as choices in cor_table
   observe({
     df = inter_go()$Description
     updatePickerInput(session, "chose_ont", choices = unique(df))
@@ -1754,14 +1773,14 @@ server <- function(input, output, session) {
   
   # isolate the abbreviated name of tox treatments when the upset plot is clicked on
   tox <- reactive({
-    combo = combo() %>% dplyr::filter(Gene %in% as.character(input$venn_click$elems)) %>% dplyr::select(Toxicant) %>% dplyr::distinct()
+    combo = combo() %>% dplyr::filter(ID %in% as.character(input$venn_click$elems)) %>% dplyr::select(Toxicant) %>% dplyr::distinct()
     tox = ifelse(combo$Toxicant == "Cyclopamine", "CYCLO", ifelse(combo$Toxicant == "Methoxyacetic acid", "MAA", ifelse(combo$Toxicant == "Ogremorphin", "OGM", ifelse(combo$Toxicant == "Triademenol", "MENOL", ifelse(combo$Toxicant == "Cyclophosphamide", "CPA", ifelse(combo$Toxicant =="Methotrexate", "MTX", ifelse(combo$Toxicant == "Valproic acid", "VPA", ifelse(combo$Toxicant == "5-Flurouracil", "5FU", ifelse(combo$Toxicant == "Hydrogen Peroxide", "H2O2", "")))))))))
     tox
   })
   
   observe({
     toggle(id = "go_input", condition = {input$corr_choice %in% "From GO Table"})
-    toggle(id = "man_input", condition = {input$corr_choice %in% "Custom"})
+    toggle(id = "man_input", condition = {input$corr_choice %in% "From Intersection Table"})
   })
   
   # corr dataframe for ontology choice
@@ -1769,10 +1788,10 @@ server <- function(input, output, session) {
     tox = tox()
     GO_click = inter_go() %>% dplyr::filter(Description %in% input$chose_ont)
     geneName = unlist(stringr::str_split(GO_click$geneID, pattern = "/"))
-    df1 = combo() %>% dplyr::select(ID, Gene) %>% dplyr::distinct() %>% dplyr::filter(Gene %in% geneName)
-    count_mir = as.data.frame(counts) %>% dplyr::mutate(Geneid = tolower(Geneid)) %>% dplyr::filter(Geneid %in% df1$ID) %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% dplyr::select(Geneid, starts_with(tox)) 
+    df1 = ovlap_df() %>% dplyr::select(microRNA, Gene) %>% dplyr::distinct() %>% dplyr::filter(Gene %in% geneName)
+    count_mir = as.data.frame(counts) %>% dplyr::mutate(Geneid = tolower(Geneid)) %>% dplyr::filter(Geneid %in% df1$microRNA) %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% dplyr::select(Geneid, starts_with(tox)) 
     count_mrna = as.data.frame(counts_rna) %>% dplyr::select(starts_with(tox)) %>% tibble::rownames_to_column(var="gene") %>% filter(gene %in% geneName)
-    df2 = df1 %>% left_join(count_mir, by = c("ID" = "Geneid")) %>% left_join(count_mrna, by = c("Gene"="gene"))
+    df2 = df1 %>% left_join(count_mir, by = c("microRNA" = "Geneid")) %>% left_join(count_mrna, by = c("Gene"="gene"))
     df3 = dplyr::mutate_if(df2, is.numeric, ~ .x + 1) # add 1 to counts so that any with zero counts will not output infinity when taking the log.
     df3 = dplyr::mutate_if(df3, is.numeric, log2) # convert df2 to log2 scale
     
@@ -1796,11 +1815,10 @@ server <- function(input, output, session) {
   
   df4 <- eventReactive(input$go12, {
     tox = tox()
-    geneName = scan(text = input$gene_input, what = "")
-    df1 = combo() %>% dplyr::select(ID, Gene) %>% dplyr::distinct() %>% dplyr::filter(Gene %in% geneName)
-    count_mir = as.data.frame(counts) %>% dplyr::mutate(Geneid = tolower(Geneid)) %>% dplyr::filter(Geneid %in% df1$ID) %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% dplyr::select(Geneid, starts_with(tox)) 
-    count_mrna = as.data.frame(counts_rna) %>% dplyr::select(starts_with(tox)) %>% tibble::rownames_to_column(var="gene") %>% filter(gene %in% geneName)
-    df2 = df1 %>% left_join(count_mir, by = c("ID" = "Geneid")) %>% left_join(count_mrna, by = c("Gene"="gene"))
+    df1 = ovlap_df() %>% dplyr::select(microRNA, Gene) %>% dplyr::distinct() %>% dplyr::filter(Gene %in% input$chose_mRNA)
+    count_mir = as.data.frame(counts) %>% dplyr::mutate(Geneid = tolower(Geneid)) %>% dplyr::filter(Geneid %in% df1$microRNA) %>% dplyr::select(-sample_id) %>% tidyr::pivot_wider(names_from = sample_rep, values_from = norm_count) %>% dplyr::select(Geneid, starts_with(tox)) 
+    count_mrna = as.data.frame(counts_rna) %>% dplyr::select(starts_with(tox)) %>% tibble::rownames_to_column(var="gene") %>% filter(gene %in% input$chose_mRNA)
+    df2 = df1 %>% left_join(count_mir, by = c("microRNA" = "Geneid")) %>% left_join(count_mrna, by = c("Gene"="gene"))
     df4 = dplyr::mutate_if(df2, is.numeric, ~ .x + 1) # add 1 to counts so that any with zero counts will not output infinity when taking the log.
     df4 = dplyr::mutate_if(df4, is.numeric, log2) # convert df2 to log2 scale
     
@@ -1834,13 +1852,14 @@ server <- function(input, output, session) {
     mrna_name <- paste0(original_cols[(length(tox)*3+3):(ncol(data)-2)], "_mRNA")
     colnames(data) <- c("microRNA", "mRNA", mir_name,  mrna_name, "correlation", "p_value")
     data %>% 
+      dplyr::relocate(c("correlation", "p_value"), .after = mRNA) %>%
       DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
     })
   
   plot_df <- eventReactive(input$corr_table_rows_selected, {
     tox = length(tox())
     info = input$corr_table_rows_selected
-    # do nothing if not clicked yet, or the clicked cell is not in the 2nd column
+    # do nothing if not clicked yet
     if (is.null(info)){ 
       return()
     }
