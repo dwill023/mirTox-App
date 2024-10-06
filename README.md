@@ -8,7 +8,7 @@ The app is hosted [here](https://willdesi.shinyapps.io/mirTox-App/).
 
 ## Docker 
 
-The (Dockerfile)[https://github.com/dwill023/mirTox-App/blob/main/Dockerfile] in the main directory can be used to build an image to run the app in a container using the following commands:
+The [Dockerfile](https://github.com/dwill023/mirTox-App/blob/main/Dockerfile) in the main directory can be used to build an image to run the app in a container using the following commands:
 
 ```
 # to build the image on a mac with ARM architecture.
