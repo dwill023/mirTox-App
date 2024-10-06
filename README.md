@@ -5,3 +5,16 @@ This app aims to help analyze microRNAs within developmental toxicologically cha
 Identified microRNAs from this method may have the potential to be used as biomarkers to screen for early bone developmental defects.
 
 The app is hosted [here](https://willdesi.shinyapps.io/mirTox-App/).
+
+## Docker 
+
+The (Dockerfile)[https://github.com/dwill023/mirTox-App/blob/main/Dockerfile] in the main directory can be used to build an image to run the app in a container using the following commands:
+
+```
+# to build the image on a mac with ARM architecture.
+docker build --platform=linux/amd64 -t mirtox-app .
+
+# else if you're building the image on linux 
+docker build -t mirtox-app .
+```
+

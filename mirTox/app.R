@@ -31,7 +31,6 @@ library(ds4psy)
 library(unikn)
 library(ggpubr)
 
-
 set.seed(99)
 
 # load data used in app
@@ -226,6 +225,12 @@ body <- bs4DashBody(
                                                   plotOutput("heatmap2", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1),
                                                   downloadButton("downheat2", "Download Plot", icon=icon("download", lib = "font-awesome"))),
                                          tabPanel("Selected miRNAs",
+                                                  fluidRow(column(4, 
+                                                                  prettyRadioButtons("rad", "Plot Type", choices = c("Median Counts", "Log2Fold-Change"), inline = T, status = "danger", fill = T)),
+                                                           column(4,
+                                                                  hidden(
+                                                                    pickerInput("FDR_h", "False Discovery Rate", choices = c(0.1, 0.05, 0.01), selected = 0.05))
+                                                                  )),
                                                   fluidRow(column(4,
                                                                   pickerInput("tox_choice3", label = "Choice of Toxicants", choices = unique(counts$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
                                                            column(4,
@@ -391,6 +396,12 @@ body <- bs4DashBody(
                                                      plotOutput("heatmap2_gene", width = "100%", height = "800px") %>% withSpinner(type = 6, size=1),
                                                      downloadButton("downheat2_g", "Download Plot", icon=icon("download", lib = "font-awesome"))),
                                             tabPanel("Selected mRNAs",
+                                                     fluidRow(column(4, 
+                                                                     prettyRadioButtons("rad2", "Plot Type", choices = c("Median Counts", "Log2Fold-Change"), inline = T, status = "danger", fill = T)),
+                                                              column(4,
+                                                                     hidden(
+                                                                       pickerInput("FDR_h2", "False Discovery Rate", choices = c(0.1, 0.05, 0.01), selected = 0.05))
+                                                              )),
                                                      fluidRow(column(4,
                                                                      pickerInput("tox_choice3_gene", label = "Choice of Toxicants", choices = unique(counts_rna2$sample_id), multiple = T, options = list(style = "btn-light", `actions-box` = TRUE))),
                                                               column(4,
@@ -506,9 +517,11 @@ body <- bs4DashBody(
                                  box("vennT", title = "Intersection Table", width = NULL, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
                                      label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "Table displays the miRs in the clicked upset plot with the target mRNAs that are expressed (RNA-seq) within the selected toxicant(s).", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                      fluidRow(column(4,
-                                                     actionBttn("get_table", "Get Table", style = "float", color = "warning", icon = icon("table")))),
+                                                     actionBttn("get_table", "Get Table", style = "float", color = "warning", icon = icon("table"))),
+                                              column(8,
+                                                     HTML('<h6 style="color:black;">Table takes time to load. Please be patient.</h6>'))),
                                      br(),
-                                     DT::dataTableOutput("venn_table") %>% withSpinner(type =6 , size=1, color = "#343a40")))),
+                                     shinycustomloader::withLoader(DT::dataTableOutput("venn_table"), type = 'image', loader = 'loading.gif')))),
                  fluidRow(column(12,
                                  box("go_inter", title = "GO of Intersecting genes", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
                                      label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "GO is generated from the mRNAs shown in the intersection table.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
@@ -650,6 +663,7 @@ server <- function(input, output, session) {
   
   observe({
     shinyjs::toggle(id = "list", condition = {input$all == "Selected microRNAs"})
+    shinyjs::toggle(id = "FDR_h", condition = {input$rad == "Log2Fold-Change"})
   })
   
   observe({
@@ -782,14 +796,29 @@ server <- function(input, output, session) {
   )
   
   heat_df3 <- eventReactive(input$go_heat3, {
-    df = counts %>% dplyr::filter(sample_id %in% input$tox_choice3 & Geneid %in% input$mirs_choice)
-    mat2 = df %>% dplyr::select(-sample_rep) %>% dplyr::group_by(Geneid, sample_id)  %>% dplyr::summarise(median = median(norm_count)) %>%
-      tidyr::pivot_wider(names_from = sample_id, values_from = median) %>% tibble::column_to_rownames(var = "Geneid") %>% as.matrix()
-    heat = t(scale(t(mat2[,1:ncol(mat2)]))) # calculates the z-score of samples starting in column 1
-    heat = na.omit(heat)
-    anno = data.frame(Treatment = colnames(heat), check.names = F)
-    row.names(anno) <- colnames(heat)
-    pheatmap(heat, annotation_col = anno, show_rownames = T, treeheight_row = 0, main = "Median normalized counts for select miRNAs")
+    if(input$rad == "Median Counts"){
+      df <-  counts %>% dplyr::filter(sample_id %in% input$tox_choice3 & Geneid %in% input$mirs_choice)
+      mat2 <-  df %>% dplyr::select(-sample_rep) %>% dplyr::group_by(Geneid, sample_id)  %>% dplyr::summarise(median = median(norm_count)) %>%
+        tidyr::pivot_wider(names_from = sample_id, values_from = median) %>% 
+        tibble::column_to_rownames(var = "Geneid") %>% 
+        as.matrix()
+      heat = t(scale(t(mat2[,1:ncol(mat2)]))) # calculates the z-score of samples starting in column 1
+      heat = na.omit(heat)
+      anno = data.frame(Treatment = colnames(heat), check.names = F)
+      row.names(anno) <- colnames(heat)
+      pheatmap(heat, annotation_col = anno, show_rownames = T, treeheight_row = 0, main = "Median normalized counts for select miRNAs")
+    } else {
+      df <- bind_rows(DEG, .id = "toxicants") %>%
+        filter(toxicants %in% input$tox_choice3 & microRNA %in% input$mirs_choice & padj < as.numeric(input$FDR_h))
+      mat2 <- df %>%
+        dplyr::select(-padj) %>%
+        tidyr::pivot_wider(names_from = toxicants, values_from = log2FoldChange) %>% 
+        tibble::column_to_rownames(var = "microRNA") %>% as.matrix()
+      mat2[is.na(mat2)] = 0
+      anno = data.frame(Treatment = colnames(mat2), check.names = F)
+      row.names(anno) <- colnames(mat2)
+      pheatmap(mat2, annotation_col = anno, show_rownames = T, treeheight_row = 0, main = paste0("Log2Fold-Change with p-adjusted ", input$FDR_h))
+    }
   })
   
   output$heatmap3 <- renderPlot({
@@ -1415,15 +1444,32 @@ server <- function(input, output, session) {
     }
   )
   
+  observe({
+    shinyjs::toggle(id = "FDR_h2", condition = {input$rad2 == "Log2Fold-Change"})
+  })
+  
   heat_df3g <- eventReactive(input$get_heat3, {
-    df = counts_rna2 %>% dplyr::filter(sample_id %in% input$tox_choice3_gene & Gene %in% input$gene_choice)
-    mat2 = df %>% dplyr::select(-sample_rep) %>% dplyr::group_by(Gene, sample_id)  %>% dplyr::summarise(median = median(norm_count)) %>%
-      tidyr::pivot_wider(names_from = sample_id, values_from = median) %>% tibble::column_to_rownames(var = "Gene") %>% as.matrix()
-    heat = t(scale(t(mat2[,1:ncol(mat2)]))) # calculates the z-score of samples starting in column 1
-    heat = na.omit(heat)
-    anno = data.frame(Treatment = colnames(heat), check.names = F)
-    row.names(anno) <- colnames(heat)
-    pheatmap(heat, annotation_col = anno, show_rownames = T, treeheight_row = 0, main = "Median normalized counts for select mRNAs")
+    if(input$rad2 == "Median Counts"){
+      df = counts_rna2 %>% dplyr::filter(sample_id %in% input$tox_choice3_gene & Gene %in% input$gene_choice)
+      mat2 = df %>% dplyr::select(-sample_rep) %>% dplyr::group_by(Gene, sample_id)  %>% dplyr::summarise(median = median(norm_count)) %>%
+        tidyr::pivot_wider(names_from = sample_id, values_from = median) %>% tibble::column_to_rownames(var = "Gene") %>% as.matrix()
+      heat = t(scale(t(mat2[,1:ncol(mat2)]))) # calculates the z-score of samples starting in column 1
+      heat = na.omit(heat)
+      anno = data.frame(Treatment = colnames(heat), check.names = F)
+      row.names(anno) <- colnames(heat)
+      pheatmap(heat, annotation_col = anno, show_rownames = T, treeheight_row = 0, main = "Median normalized counts for select mRNAs")
+    } else {
+      df <- bind_rows(DEG_rna, .id = "toxicants") %>%
+        filter(toxicants %in% input$tox_choice3_gene & Gene %in% input$gene_choice & padj < as.numeric(input$FDR_h2))
+      mat2 <- df %>%
+        dplyr::select(-padj) %>%
+        tidyr::pivot_wider(names_from = toxicants, values_from = log2FoldChange) %>% 
+        tibble::column_to_rownames(var = "Gene") %>% as.matrix()
+      mat2[is.na(mat2)] = 0
+      anno = data.frame(Treatment = colnames(mat2), check.names = F)
+      row.names(anno) <- colnames(mat2)
+      pheatmap(mat2, annotation_col = anno, show_rownames = T, treeheight_row = 0, main = paste0("Log2Fold-Change with p-adjusted ", input$FDR_h2))
+    }
   })
   
   output$heatmap3_gene <- renderPlot({
@@ -1853,7 +1899,7 @@ server <- function(input, output, session) {
         dplyr::mutate(Gene = paste0("<a href='","https://www.genecards.org/cgi-bin/carddisp.pl?gene=", Gene, "' target='_blank'>", Gene, "</a>")) %>%
         dplyr::rename("PMID" = "Literature", "mRNA" = "Gene") %>%
         dplyr::select(microRNA, mRNA, Experiment, PMID, Toxicant) %>%
-        DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
+        DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(5,10,20,-1), c(5,10,20,"All")), pageLength = 5), rownames = FALSE)
     } else {
       ovlap_df() %>% 
         dplyr::select(-TargetID) %>%
