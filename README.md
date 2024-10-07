@@ -18,3 +18,11 @@ docker build --platform=linux/amd64 -t mirtox-app .
 docker build -t mirtox-app .
 ```
 
+To run the container:
+```
+docker container run --rm -p 3838:3838 mirtox-app
+```
+
+The app will be visible at http://localhost:3838/
+
+
