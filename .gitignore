@@ -5,3 +5,4 @@
 .Ruserdata
 .Rprofile
 renv/
+*.tar.gz
