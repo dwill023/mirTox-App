@@ -1,5 +1,3 @@
-#library(BiocManager)
-#options(repos = BiocManager::repositories())
 library(shiny)
 library(shinyjs)
 library(shinyWidgets)
@@ -20,8 +18,6 @@ library(fmsb)
 library(gt)
 library(matrixStats)
 library(pheatmap)
-library(miRNetR)
-library(multiMiR)
 library(clusterProfiler)
 library(org.Hs.eg.db)
 library(ReactomePA)
@@ -34,11 +30,13 @@ library(ggpubr)
 set.seed(99)
 
 # load data used in app
-counts = readRDS("./data/counts_new.rds") # this is the normalized counts by DESeq2
-DEG = readRDS("./data/DEG_list.rds") # this is a list of the DEG for the 9 treatments.
-counts_rna = readRDS("./data/Norm_counts_rnaseq.rds") # MATRIX normalized counts for RNA-seq
-counts_rna2 = readRDS("./data/counts_new_mrna.rds") # counts with sample_id added
-DEG_rna = readRDS("./data/DEG_rnaseq.rds") # DEG for RNA-seq
+counts <- readRDS("/app/data/counts_new.rds") # this is the normalized counts by DESeq2
+DEG <- readRDS("/app/data/DEG_list.rds") # this is a list of the DEG for the 9 treatments.
+counts_rna <- readRDS("/app/data/Norm_counts_rnaseq.rds") # MATRIX normalized counts for RNA-seq
+counts_rna2 <- readRDS("/app/data/counts_new_mrna.rds") # counts with sample_id added
+DEG_rna <- readRDS("/app/data/DEG_rnaseq.rds") # DEG for RNA-seq
+mir_to_gene <- readr::read_csv("/app/data/mir_targets.csv", show_col_types = FALSE)
+predicted_targets <- readr::read_csv("/app/data/targetscan.csv", show_col_types = FALSE) # predicted targets from targetscan v7.2 https://www.targetscan.org/vert_72/
 
 
 
@@ -293,7 +291,7 @@ body <- bs4DashBody(
                                                       shinycustomloader::withLoader(DT::DTOutput("targetstable",  height = "500px"), type = 'image', loader = 'coffee_loading.gif')),
                                              tabPanel(HTML('<h6 style="color:black;">Ontology</h6>'), value = "tab2",
                                                       fluidRow(column(5,
-                                                                      radioGroupButtons("ont", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease", "GO:Biological Process", "WikiPathways"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
+                                                                      radioGroupButtons("ont", "Choice of Ontology Database", choices = c("REACTOME", "Disease", "GO:Biological Process", "WikiPathways"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
                                                                column(3,
                                                                       actionBttn("go6", "Get Table", style = "jelly", color="danger"))),
                                                       br(),
@@ -455,7 +453,7 @@ body <- bs4DashBody(
                                                                              fluidRow(column(4,
                                                                                              textAreaInput("mrna_list", "Input custom mRNAs", placeholder = "ACTN1", cols=17, rows = 4, resize = "both"))))),
                                                          fluidRow(column(5,
-                                                                         radioGroupButtons("ont_choice", "Choice of Ontology Database", choices = c("KEGG", "REACTOME", "Disease", "GO:Biological Process", "WikiPathways"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
+                                                                         radioGroupButtons("ont_choice", "Choice of Ontology Database", choices = c("REACTOME", "Disease", "GO:Biological Process", "WikiPathways"), status = "success", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
                                                                   column(3,
                                                                          actionBttn("get_go", "Get Table", style = "jelly", color="danger", icon = icon("circle-play"))),
                                                                   column(3,
@@ -526,7 +524,7 @@ body <- bs4DashBody(
                                  box("go_inter", title = "GO of Intersecting genes", width = 12, collapsible = TRUE, collapsed = FALSE, maximizable = T, status = "primary", solidHeader = TRUE, background = "white",
                                      label = boxLabel(text = "?", status = "danger") %>% tippy(tooltip = "GO is generated from the mRNAs shown in the intersection table.", interactive = TRUE, placement = "top", allowHTML = TRUE, arrow = TRUE),
                                      fluidRow(column(5,
-                                                     radioGroupButtons("ont2", HTML('<h6 style="color:black;">Choice of Ontology Database</h6>'), choices = c("KEGG", "REACTOME", "Disease", "GO:BP", "WikiPathways"), status = "warning", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
+                                                     radioGroupButtons("ont2", HTML('<h6 style="color:black;">Choice of Ontology Database</h6>'), choices = c("REACTOME", "Disease", "GO:BP", "WikiPathways"), status = "warning", checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("xmark", lib = "glyphicon")))),
                                               column(2,
                                                      actionBttn("go10", "Get Table", style = "jelly", color="danger"))),
                                      shinycustomloader::withLoader(DT::dataTableOutput("inter_table"), type = 'image', loader = 'loading.gif')))),
@@ -949,15 +947,14 @@ server <- function(input, output, session) {
     reset("get_pred")
     updateSliderTextInput(session, "FC_3", selected = 1)
     updateRadioGroupButtons(session, "reg2", selected = "Up-regulated")
-    updateRadioGroupButtons(session, "ont", selected = "KEGG")
+    updateRadioGroupButtons(session, "ont", selected = "REACTOME")
     updatePickerInput(session, "ont_pick", choices = "")
     updatePickerInput(session, "ont_pick2", choices = "")
     hide(selector = "#tabbox3 li a[data-value=tab2]")
     hide(selector = "#tabbox3 li a[data-value=tab3]")
     hide(selector = "#tabbox3 li a[data-value=tab4]")
   })
-  
-  
+
   mirs_choice <- reactive({
     if(input$go_choice %in% "Toxicant"){
       df = DEG[[input$tox2]]
@@ -974,83 +971,28 @@ server <- function(input, output, session) {
     mirs
   })
   
-
-  # get the microRNA targets for a specific toxicant
-  .on.public.web <- FALSE; # only TRUE when on mirnet web server
-  # function to set up the type of mir targets needed. 
-  setdatamulti <- function () 
-  {
-    dataSet$type <- c("gene")
-    dataSet <<- dataSet
-    if (.on.public.web) {
-      return(1)
-    }
-    else {
-      return(paste("Targets were entered!"))
-    }
-  }
-  
-  mirnet_targets <- eventReactive(input$go5, {
-    mirs = mirs_choice()
-    #### Step 1. Initiate the dataSet object
-    Init.Data("mir", "mirlist")
-    #### Step 2. Set up the user input data
-    SetupMirListData(mirs = mirs, orgType = "hsa", idType = "mir_id", tissue = "na")
-    #### Step 3. Set up targets
-    setdatamulti()
-    #### Step 4. Perform miRNAs to multiple targets mapping, results are downloaded in your working directory
-    QueryMultiListMir()
-    res = mir.resu %>% dplyr::select(-Tissue)
-    res
+  # get validated mir to gene targets
+  valid_targets <- eventReactive(input$go5, {
+    df <- mir_to_gene %>% dplyr::filter(mir_id %in% mirs_choice()) %>% 
+      dplyr::mutate(embl = paste0("<a href='","https://www.ensembl.org/id/", embl, "' target='_blank'>", embl, "</a>")) %>%
+      dplyr::rename("microRNA" = "mir_id", "microRNA_acc" = "mir_acc", "target_ensembl" = "embl", "target_gene" = "symbol", "NCBI Gene" = "entrez")
+    df
   })
   
   # get predicted targets if button get_pred is clicked
   targets_pred <- eventReactive(input$get_pred, {
-    multimir_miranda <- get_multimir(org     = 'hsa',
-                                     mirna   = mirs_choice(),
-                                     predicted.cutoff = 20, # Top 20% of the results to be returned
-                                     table   =  "miranda",
-                                     predicted.cutoff.type = "p", # percentage cutoff
-                                     summary = TRUE)
-    
-    multimir_targetscan <- get_multimir(org     = 'hsa',
-                                        mirna   = mirs_choice(),
-                                        predicted.cutoff = 20, # Top 20% of the results to be returned
-                                        table   =  "targetscan",
-                                        predicted.cutoff.type = "p", # percentage cutoff
-                                        summary = TRUE)
-    
-    multimir_mirdb <- get_multimir(org     = 'hsa',
-                                   mirna   = mirs_choice(),
-                                   predicted.cutoff = 20, # Top 20% of the results to be returned
-                                   table   =  "mirdb",
-                                   predicted.cutoff.type = "p", # percentage cutoff
-                                   summary = TRUE)
-    
-    multimir_diana <- get_multimir(org     = 'hsa',
-                                   mirna   = mirs_choice(),
-                                   predicted.cutoff = 20, # Top 20% of the results to be returned
-                                   table   = "diana_microt",
-                                   predicted.cutoff.type = "p", # percentage cutoff
-                                   summary = TRUE)
-    
-    mirdb = as.data.frame(multimir_mirdb@summary) %>% dplyr::select(-mature_mirna_acc, -target_ensembl)
-    targetscan = as.data.frame(multimir_targetscan@summary) %>% dplyr::select(-mature_mirna_acc, -target_ensembl)
-    miranda = as.data.frame(multimir_miranda@summary) %>% dplyr::select(-mature_mirna_acc, -target_ensembl)
-    diana = as.data.frame(multimir_diana@summary) %>% dplyr::select(-mature_mirna_acc, -target_ensembl)
-    df_list = list(mirdb, targetscan, miranda, diana)
-    predicted_final = df_list %>% purrr::reduce(dplyr::full_join)
-    predicted_final = predicted_final %>% replace(is.na(.), 0)
-    predicted_final = predicted_final %>% dplyr::rowwise() %>% dplyr::mutate(Total = sum(c_across(mirdb:diana_microt))) %>% dplyr::distinct()
-    predicted_final
+    df <- predicted_targets %>%
+      dplyr::mutate(mirna = tolower(mirna)) %>%
+      dplyr::filter(mirna %in% mirs_choice()) %>%
+      dplyr::mutate(GENEID = paste0("<a href='","https://www.ensembl.org/id/", GENEID, "' target='_blank'>", GENEID, "</a>")) %>%
+      dplyr::rename("microRNA" = "mirna", "target_ensembl" = "GENEID", "transcription_ID" = "TXID", "NCBI Gene" = "entrez")
+    df
   })
   
   observe({
     input$go5
     output$targetstable <- renderDT({
-      mirnet_targets() %>% 
-        dplyr::mutate(TargetID = paste0("<a href='","https://www.ncbi.nlm.nih.gov/gene/", TargetID, "' target='_blank'>", TargetID, "</a>")) %>%
-        dplyr::rename("microRNA" = "ID", "PMID" = "Literature", "Entrez Gene ID" = "TargetID") %>%
+      valid_targets() %>%
         datatable(rownames=F, filter="top", escape = F, extensions =c("Buttons"), options = list(dom = 'lBrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")),
                                                                                                  pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All")),
                                                                                                  initComplete = JS(
@@ -1064,17 +1006,14 @@ server <- function(input, output, session) {
   observe({
     input$get_pred
     output$targetstable <- renderDT({
-      targets_pred() %>% 
-        dplyr::mutate(target_entrez = paste0("<a href='","https://www.ncbi.nlm.nih.gov/gene/", target_entrez, "' target='_blank'>", target_entrez, "</a>")) %>%
-        dplyr::rename("microRNA" = "mature_mirna_id", "Entrez Gene ID" = "target_entrez", "Total Predicted Sites" = "Total") %>%
+      targets_pred() %>%
         datatable(rownames=F, filter="top", escape = F, extensions =c("Buttons"), options = list(dom = 'lBrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")),
-                                                                                                 columnDefs = list(list(className = 'dt-center', targets = c(0,1,2,3,4,5,6,7))),
                                                                                                  pageLength = 10, lengthMenu = list(c(10, 20, 50, -1), c("10", "20", "50", "All")),
                                                                                                  initComplete = JS(
                                                                                                    "function(settings, json) {",
                                                                                                    "$(this.api().table().header()).css({'background-color': '#E5E4E2', 'color': '#435875'});",
                                                                                                    "}"))) %>%
-        formatStyle(columns = 0:7, backgroundColor = "#E5E4E2",color = "#282828",target = 'row')
+        formatStyle(columns = 0:5, backgroundColor = "#E5E4E2",color = "#282828",target = 'row')
     })
   })
   
@@ -1094,14 +1033,15 @@ server <- function(input, output, session) {
   
   targets <- reactive({
     if(input$go5 == 1){
-      targets = unique(mirnet_targets()$TargetID)
+      targets = as.character(unique(valid_targets()$`NCBI Gene`))
     } else {
-      targets = unique(targets_pred()$target_entrez)
+      targets = unique(targets_pred()$`NCBI Gene`)
     }
   })
   
   go_table <- eventReactive(input$go6, {
     if (input$ont %in% "KEGG"){
+      # KEGG isn't working
       res <- enrichKEGG(gene         = targets(),
                         organism     = 'hsa',
                         pvalueCutoff = 0.05)
@@ -1597,7 +1537,7 @@ server <- function(input, output, session) {
     reset("go_box_g")
     updateSliderTextInput(session, "FC_gene3", selected = 1)
     updateRadioGroupButtons(session, "gene_reg", selected = "Up-regulated")
-    updateRadioGroupButtons(session, "ont_choice", selected = "KEGG")
+    updateRadioGroupButtons(session, "ont_choice", selected = "REACTOME")
     hide(selector = "#tabbox5 li a[data-value=tab3g]")
     hide(selector = "#tabbox5 li a[data-value=tab4g]")
   })
@@ -1629,6 +1569,7 @@ server <- function(input, output, session) {
   go_table_g <- eventReactive(input$get_go, {
     gene_id = clusterProfiler::bitr(unique(mrna_choice()), fromType = "SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
     if (input$ont_choice %in% "KEGG"){
+      # KEGG isn't working in the clusterprofiler package url probably changed
       res <- enrichKEGG(gene         = gene_id$ENTREZID,
                         organism     = 'hsa',
                         pvalueCutoff = 0.05)
@@ -1808,86 +1749,45 @@ server <- function(input, output, session) {
   mir_targets <- eventReactive(input$get_table, {
     mirs = tolower(as.character(input$venn_click$elems))
     if(input$pick_targets == "Validated Targets"){
-      #### Step 1. Initiate the dataSet object
-      Init.Data("mir", "mirlist")
-      #### Step 2. Set up the user input data
-      SetupMirListData(mirs = mirs, orgType = "hsa", idType = "mir_id", tissue = "na")
-      #### Step 3. Set up targets
-      setdatamulti()
-      #### Step 4. Perform miRNAs to multiple targets mapping, results are downloaded in your working directory
-      QueryMultiListMir()
-      res = mir.resu %>% dplyr::select(-Tissue)
+      res <- mir_to_gene %>% dplyr::filter(mir_id %in% mirs) %>% dplyr::rename("microRNA" = "mir_id", "Target" = "symbol")
     } else {
-      multimir_miranda <- get_multimir(org     = 'hsa',
-                                       mirna   = mirs,
-                                       predicted.cutoff = 20, # Top 20% of the results to be returned
-                                       table   =  "miranda",
-                                       predicted.cutoff.type = "p", # percentage cutoff
-                                       summary = TRUE)
-      
-      multimir_targetscan <- get_multimir(org     = 'hsa',
-                                          mirna   = mirs,
-                                          predicted.cutoff = 20, # Top 20% of the results to be returned
-                                          table   =  "targetscan",
-                                          predicted.cutoff.type = "p", # percentage cutoff
-                                          summary = TRUE)
-      
-      multimir_mirdb <- get_multimir(org     = 'hsa',
-                                     mirna   = mirs,
-                                     predicted.cutoff = 20, # Top 20% of the results to be returned
-                                     table   =  "mirdb",
-                                     predicted.cutoff.type = "p", # percentage cutoff
-                                     summary = TRUE)
-      
-      multimir_diana <- get_multimir(org     = 'hsa',
-                                     mirna   = mirs,
-                                     predicted.cutoff = 20, # Top 20% of the results to be returned
-                                     table   = "diana_microt",
-                                     predicted.cutoff.type = "p", # percentage cutoff
-                                     summary = TRUE)
-      
-      mirdb = as.data.frame(multimir_mirdb@summary) %>% dplyr::select(-mature_mirna_acc, -target_ensembl)
-      targetscan = as.data.frame(multimir_targetscan@summary) %>% dplyr::select(-mature_mirna_acc, -target_ensembl)
-      miranda = as.data.frame(multimir_miranda@summary) %>% dplyr::select(-mature_mirna_acc, -target_ensembl)
-      diana = as.data.frame(multimir_diana@summary) %>% dplyr::select(-mature_mirna_acc, -target_ensembl)
-      df_list = list(mirdb, targetscan, miranda, diana)
-      res = df_list %>% purrr::reduce(dplyr::full_join)
-      res = res %>% replace(is.na(.), 0)
-      res = res %>% dplyr::rowwise() %>% dplyr::mutate(Total = sum(c_across(mirdb:diana_microt))) %>% dplyr::distinct() %>% dplyr::rename("ID" = "mature_mirna_id", "Target" = "target_symbol", "TargetID" = "target_entrez")
-      res$ID = tolower(res$ID)
+      res <- predicted_targets %>%
+        dplyr::mutate(mirna = tolower(mirna)) %>%
+        dplyr::filter(mirna %in% mirs) %>%
+        dplyr::rename("microRNA" = "mirna", "Target" = "target_gene")
     }
     mir_df = mir_filt()[,1:2] %>% dplyr::mutate(microRNA = tolower(microRNA)) %>% dplyr::distinct()
-    final = left_join(res, mir_df, by = c("ID" ="microRNA"))
+    final = left_join(res, mir_df, by = "microRNA", multiple = "all")
     final
   })
   
   # filter the differentially expressed mRNAs by the FC & FDR cutoff chosen 
   mrnas <- eventReactive(input$get_table,{
-    df = DEG_rna[input$tox3]
-    df = bind_rows(df, .id = "Toxicant")
+    mrna = DEG_rna[input$tox3]
+    mrna = bind_rows(mrna, .id = "Toxicant")
     if (input$rna_reg == "Up-regulated"){
-      filtered_df = df %>% dplyr::filter(padj < as.numeric(input$FDR_4) & (log2FoldChange > input$FC_4))
+      filtered_df = mrna %>% dplyr::filter(padj < as.numeric(input$FDR_4) & (log2FoldChange > input$FC_4))
     } else {
-      filtered_df = df %>% dplyr::filter(padj < as.numeric(input$FDR_4) & (log2FoldChange < -input$FC_4))
+      filtered_df = mrna %>% dplyr::filter(padj < as.numeric(input$FDR_4) & (log2FoldChange < -input$FC_4))
     }
     filtered_df
   })
   
   ovlap_df <- eventReactive(input$get_table, {
-    df2 = left_join(mrnas()[,1:2], mir_targets(), by = c("Toxicant" = "Toxicant", "Gene" = "Target")) %>% na.omit()
-    combo_df = tidyr::pivot_wider(data = df2[,1:3], id_cols = Gene, names_from = Toxicant, values_from = ID, values_fn = toString)
+    df2 = left_join(mrnas()[,1:2], mir_targets(), by = c("Toxicant" = "Toxicant", "Gene" = "Target"), multiple = "all") %>% na.omit()
+    combo_df = tidyr::pivot_wider(data = df2[,1:3], id_cols = Gene, names_from = Toxicant, values_from = microRNA, values_fn = toString)
     combo_df2 = combo_df %>% tidyr::drop_na() %>% tibble::column_to_rownames(var = "Gene")
     df3 = combo_df2 %>% dplyr::mutate(same = apply(combo_df2, 1, function(x) all(x==x[1]))) # test if each row is equal to get only genes that have the same microRNAs in all treatments
     df3 = df3 %>% dplyr::filter(same %in% TRUE) %>%
       tibble::rownames_to_column(var = "Gene") %>%
       dplyr::select(-same) %>%
       tidyr::separate_rows(2:ncol(combo_df), sep = ",") %>%
-      mutate(across(everything(), stringr::str_trim, side = "both"))
+      mutate(across(everything(), \(x) stringr::str_trim(x, side = "both")))
       
     combo_df3 = tidyr::pivot_longer(df3, cols = !1, names_to = "Toxicant", values_to = "microRNA")
     df4 = combo_df3 %>% group_by_at(vars(Gene, microRNA)) %>% summarise_all(paste, collapse = ", ") %>% ungroup()
     df5 = df2 %>% dplyr::select(-Toxicant) %>% dplyr::distinct()
-    intersect_table = dplyr::left_join(df4, df5, by = c("Gene" = "Gene", "microRNA" = "ID"))
+    intersect_table = dplyr::left_join(df4, df5, by = c("Gene", "microRNA"))
     intersect_table
   })
   
@@ -1895,39 +1795,37 @@ server <- function(input, output, session) {
     validate(need(!is.null(input$venn_click$elems), message = "First click on an intersection in the upset plot to get miRs, then click the 'Get Table' button."))
     if(input$pick_targets == "Validated Targets"){
       ovlap_df() %>% 
-        dplyr::select(-TargetID, -Accession) %>%
         dplyr::mutate(Gene = paste0("<a href='","https://www.genecards.org/cgi-bin/carddisp.pl?gene=", Gene, "' target='_blank'>", Gene, "</a>")) %>%
-        dplyr::rename("PMID" = "Literature", "mRNA" = "Gene") %>%
-        dplyr::select(microRNA, mRNA, Experiment, PMID, Toxicant) %>%
+        dplyr::rename("PMID" = "pmid", "mRNA" = "Gene") %>%
+        dplyr::select(microRNA, mRNA, Experiment = experiment, PMID, Toxicant) %>%
         DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(5,10,20,-1), c(5,10,20,"All")), pageLength = 5), rownames = FALSE)
     } else {
       ovlap_df() %>% 
-        dplyr::select(-TargetID) %>%
         dplyr::mutate(Gene = paste0("<a href='","https://www.genecards.org/cgi-bin/carddisp.pl?gene=", Gene, "' target='_blank'>", Gene, "</a>")) %>%
         dplyr::rename("mRNA" = "Gene") %>%
-        dplyr::relocate(Toxicant, .after = Total) %>%
-        dplyr::relocate(mRNA, .after = microRNA) %>%
+        dplyr::select(mRNA, microRNA, GENEID, Toxicant) %>%
         DT::datatable(extensions = 'Buttons', filter = "top", escape = F, selection = "single", options = list(scrollX = TRUE, "dom" = 'T<"clear">lBfrtip', buttons = list('copy', list(extend = "collection", buttons = c("csv", "excel", "pdf"), text = "Download")), lengthMenu = list(c(10,20,-1), c(10,20,"All")), pageLength = 10), rownames = FALSE)
     }
   })
   
 
   inter_go <- eventReactive(input$go10, {
-    entrezid = ovlap_df() %>% dplyr::select(TargetID) %>% dplyr::distinct()
+    entrezid = ovlap_df() %>% dplyr::select(entrez) %>% dplyr::pull()
     if (input$ont2 %in% "KEGG"){
-      res <- enrichKEGG(gene         = entrezid$TargetID,
+      # KEGG not working in this package, old internal url
+      res <- enrichKEGG(gene         = entrezid,
                         organism     = 'hsa',
                         pvalueCutoff = 0.05)
       
       res <- setReadable(res, OrgDb = org.Hs.eg.db, keyType="ENTREZID")
     } else if (input$ont2 %in% "REACTOME"){
-      res <- enrichPathway(gene          = entrezid$TargetID,
+      res <- enrichPathway(gene          = entrezid,
                            organism      = "human",
                            pvalueCutoff  = 0.05,
                            pAdjustMethod = "BH",
                            readable      = TRUE)
     } else if (input$ont2 %in% "Disease") {
-      res <- enrichDO(gene          = entrezid$TargetID,
+      res <- enrichDO(gene          = entrezid,
                       ont           = "DO",
                       pvalueCutoff  = 0.05,
                       pAdjustMethod = "BH",
@@ -1936,7 +1834,7 @@ server <- function(input, output, session) {
                       qvalueCutoff  = 0.05,
                       readable      = TRUE)
     } else if (input$ont2 %in% "GO:BP"){
-      res <- enrichGO(gene          = entrezid$TargetID,
+      res <- enrichGO(gene          = entrezid,
                       OrgDb         = org.Hs.eg.db,
                       ont           = "BP",
                       pAdjustMethod = "BH",
@@ -1944,7 +1842,7 @@ server <- function(input, output, session) {
                       qvalueCutoff  = 0.05,
                       readable      = TRUE)
     } else {
-      res <- enrichWP(gene          = entrezid$TargetID,
+      res <- enrichWP(gene          = entrezid,
                       organism      = "Homo sapiens",
                       pvalueCutoff  = 0.05,
                       pAdjustMethod = "BH")
