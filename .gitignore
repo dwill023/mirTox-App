@@ -6,3 +6,4 @@
 .Rprofile
 renv/
 *.tar.gz
+mirTox/data/
